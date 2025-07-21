@@ -1,18 +1,21 @@
 // User type
 export interface User {
-  id: string;
+  userId: string;
+  name: string;
+  mobile: string;
   email: string;
-  passwordHash: string;
   role: "admin" | "user";
   createdAt: Date;
+  updatedAt: Date;
+  _id?: undefined;
 }
 
 // JWT Payload type
 export interface JWTPayload {
   userId: string;
-  email: string;
+  mobile?: string;
   role: "admin" | "user";
-  exp: number;
+  exp?: number;
 }
 
 // Generic API Response type

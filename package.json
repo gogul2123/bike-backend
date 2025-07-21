@@ -1,11 +1,12 @@
 {
+  "type": "module",
   "name": "bike-rental-backend",
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts"
+    "dev": "tsx watch src/server.ts"
   },
   "keywords": [],
   "author": "",
@@ -18,13 +19,18 @@
     "helmet": "^8.1.0",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.17.0"
+    "mongodb": "^6.17.0",
+    "redis": "^5.6.0",
+    "speakeasy": "^2.0.0",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.20.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.0.6",
+    "@types/speakeasy": "^2.0.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }
