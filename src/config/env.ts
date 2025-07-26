@@ -8,6 +8,7 @@ export const envConfig = {
   nodeEnv: process.env.NODE_ENV || "development",
   speak_easySecret: process.env.SPEAKEASY_SECRET!,
   mongoDbUri: process.env.MONGODB_URI || "mongodb://localhost:27017",
+  mongoDbName: process.env.MONGODB_NAME || "bike",
 };
 
 for (const [k, v] of Object.entries(envConfig)) {

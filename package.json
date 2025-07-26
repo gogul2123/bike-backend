@@ -17,13 +17,11 @@
     "dotenv": "^17.0.0",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.17.0",
-    "redis": "^5.6.0",
     "speakeasy": "^2.0.0",
-    "tsc-alias": "^1.8.16",
-    "tsx": "^4.20.3"
+    "tsx": "^4.20.3",
+    "zod": "^4.0.10"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

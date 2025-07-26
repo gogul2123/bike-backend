@@ -7,28 +7,47 @@ import { sendError, sendSuccess } from "../../utils/response.ts";
 import { envConfig } from "../../config/env.ts";
 
 export async function sendOtpHandler(req: Request, res: Response) {
-  const { mobile } = req.body;
-  if (!mobile) sendError(res, 400, "Missing mobile");
-  const otp = await sendOtp(mobile);
-  if (envConfig.nodeEnv === "development") {
-    console.log(`OTP for ${mobile}: ${otp}`);
-    sendSuccess(res, { otp }, "OTP sent successfully (development mode)");
-    return;
+  try {
+    const { mobile } = req.body;
+    const otp = await sendOtp(mobile);
+    if (envConfig.nodeEnv === "development") {
+      console.log(`OTP for ${mobile}: ${otp}`);
+      sendSuccess(res, { otp }, "OTP sent successfully (development mode)");
+      return;
+    }
+    sendSuccess(res, {}, "OTP sent successfully");
+  } catch (error) {
+    console.error("Error sending OTP:", error);
+    sendError(res, 500, "Internal server error");
   }
-  sendSuccess(res, {}, "OTP sent successfully");
 }
 
 export async function verifyOtpHandler(req: Request, res: Response) {
-  const { mobile, otp } = req.body;
-  if (!mobile || !otp) {
-    sendError(res, 400, "Missing params");
+  try {
+    const { mobile, otp } = req.body;
+    const valid = await verifyOtp(mobile, otp);
+    if (!valid) {
+      sendError(res, 400, "Invalid OTP");
+      return;
+    }
+    const user = await getOrCreateUser(mobile);
+    if (!user) {
+      sendError(res, 500, "Failed to get or create use r");
+      return;
+    }
+
+    const token = generateToken({
+      userId: user.userId,
+      mobile,
+      role: user.role,
+    });
+    if (user.status === "inactive") {
+      sendSuccess(res, { token, user }, "OTP verified, user is inactive");
+      return;
+    }
+    sendSuccess(res, { token, user });
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    sendError(res, 500, "Internal server error");
   }
-  const valid = await verifyOtp(mobile, otp);
-  if (!valid) {
-    sendError(res, 400, "Invalid OTP");
-    return;
-  }
-  const user = await getOrCreateUser(mobile);
-  const token = generateToken({ userId: user.userId, mobile, role: user.role });
-  sendSuccess(res, { token, user });
 }

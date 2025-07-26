@@ -1,18 +1,19 @@
 // modules/auth/user.service.ts
-import { User } from "../../types";
-import { generateEpochId } from "../../utils/generator";
-import { connect } from "../db/database";
+
+import { stat } from "fs";
+import { User } from "../../types/index.ts";
+import { generateNumericEpochId } from "../../utils/generator.ts";
+import { getCollection } from "../db/database.ts";
+import { UpdateUserInput } from "./user.model.ts";
 
 export async function getOrCreateUser(
   mobile: string,
   role?: "user" | "admin"
 ): Promise<User> {
-  const client = await connect();
-  const col = client.db().collection<User>("users");
-
+  const col = await getCollection("users");
   let user = await col.findOne({ mobile });
   if (!user) {
-    const userId = generateEpochId("usr_");
+    const userId = generateNumericEpochId("USR");
     user = {
       mobile,
       email: "",
@@ -22,8 +23,23 @@ export async function getOrCreateUser(
       updatedAt: new Date(),
       role: role || "user",
       _id: undefined,
+      status: "inactive",
     };
     await col.insertOne(user);
   }
   return user;
+}
+
+export async function updateUserStatus(
+  data: UpdateUserInput
+): Promise<boolean> {
+  const col = await getCollection("users");
+  const result = await col.updateOne(
+    { userId: data.userId },
+    { $set: { ...data, updatedAt: new Date(), status: "active" } }
+  );
+  if (result.modifiedCount === 0) {
+    throw new Error("User not found or no changes made");
+  }
+  return result.modifiedCount > 0;
 }

@@ -1,19 +1,32 @@
-export function generateEpochId(prefix: string, length?: number): string {
-  const now = Date.now();
-  let ts = now.toString(36); // base36 encoding for compactness
+let lastTimestamp = 0;
+let counter = 0;
 
-  if (length != null) {
-    const totalLen = prefix.length + ts.length;
+/**
+ * Generate a numeric-only ID: prefix + epoch timestamp + counter padded.
+ */
+export function generateNumericEpochId(
+  prefix: string,
+  totalLength?: number
+): string {
+  const now = Date.now(); // milliseconds since Unix epoch
+  if (now === lastTimestamp) {
+    counter++;
+  } else {
+    lastTimestamp = now;
+    counter = 0;
+  }
 
-    if (totalLen < length) {
-      const padSize = length - totalLen;
-      ts = ts.padStart(ts.length + padSize, "0");
-    } else if (totalLen > length) {
-      // truncate timestamp to fit
-      const tsLengthAllowed = length - prefix.length;
-      ts = ts.slice(-tsLengthAllowed);
+  // construct: prefix + timestamp (ms) + counter (3 digits)
+  const idCore = `${now}${counter.toString().padStart(3, "0")}`;
+  let result = `${prefix}${idCore}`;
+
+  if (totalLength != null) {
+    if (result.length < totalLength) {
+      result = result.padEnd(totalLength, "0");
+    } else if (result.length > totalLength) {
+      result = result.slice(0, totalLength);
     }
   }
 
-  return `${prefix}${ts}`;
+  return result;
 }

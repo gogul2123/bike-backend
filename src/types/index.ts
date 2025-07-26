@@ -8,6 +8,7 @@ export interface User {
   createdAt: Date;
   updatedAt: Date;
   _id?: undefined;
+  status: "active" | "inactive";
 }
 
 // JWT Payload type
