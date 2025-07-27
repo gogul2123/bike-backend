@@ -43,3 +43,12 @@ export async function updateUserStatus(
   }
   return result.modifiedCount > 0;
 }
+
+export async function getUserByID(userId: string): Promise<User | null> {
+  const col = await getCollection("users");
+  const user = await col.findOne(
+    { userId },
+    { projection: { password: 0, _id: 0 } }
+  );
+  return user;
+}
