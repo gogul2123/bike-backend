@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Indian Bikes - OTP Verification</title>
+    <!--[if mso]>
+      <noscript>
+        <xml>
+          <o:OfficeDocumentSettings>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+          </o:OfficeDocumentSettings>
+        </xml>
+      </noscript>
+    <![endif]-->
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+        Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333333;
+      background-color: #f4f4f4;
+    "
+  >
+    <!-- Email Container -->
+    <table
+      role="presentation"
+      cellspacing="0"
+      cellpadding="0"
+      border="0"
+      width="100%"
+      style="background-color: #f4f4f4; margin: 0; padding: 0"
+    >
+      <tr>
+        <td style="padding: 20px 0">
+          <!-- Main Email Content -->
+          <table
+            role="presentation"
+            cellspacing="0"
+            cellpadding="0"
+            border="0"
+            width="100%"
+            style="
+              max-width: 600px;
+              margin: 0 auto;
+              background-color: #ffffff;
+              border-radius: 8px;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+              overflow: hidden;
+            "
+          >
+            <!-- Header Section -->
+            <tr>
+              <td
+                style="
+                  background: linear-gradient(
+                    135deg,
+                    #ff6b35 0%,
+                    #f7931e 50%,
+                    #138808 100%
+                  );
+                  padding: 30px 20px;
+                  text-align: center;
+                "
+              >
+                <!-- Logo Area -->
+                <div style="margin-bottom: 20px">
+                  <h1
+                    style="
+                      color: #ffffff;
+                      font-size: 28px;
+                      font-weight: bold;
+                      margin: 0;
+                      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+                      letter-spacing: 1px;
+                    "
+                  >
+                    🏍️ INDIAN BIKES
+                  </h1>
+                  <p
+                    style="
+                      color: #ffffff;
+                      margin: 5px 0 0 0;
+                      font-size: 14px;
+                      opacity: 0.9;
+                    "
+                  >
+                    Ride with Pride
+                  </p>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Content Section -->
+            <tr>
+              <td style="padding: 40px 30px">
+                <!-- Greeting -->
+                <h2
+                  style="
+                    color: #333333;
+                    font-size: 24px;
+                    font-weight: 600;
+                    margin: 0 0 20px 0;
+                    text-align: center;
+                  "
+                >
+                  Hello <%= userName || 'Rider' %>!
+                </h2>
+
+                <!-- Main Message -->
+                <p
+                  style="
+                    color: #666666;
+                    font-size: 16px;
+                    line-height: 1.6;
+                    margin: 0 0 30px 0;
+                    text-align: center;
+                  "
+                >
+                  We received a request to verify your account with Indian
+                  Bikes. Use the OTP below to complete your verification.
+                </p>
+
+                <!-- OTP Box -->
+                <div
+                  style="
+                    background: linear-gradient(135deg, #ff6b35, #f7931e);
+                    border-radius: 12px;
+                    padding: 30px;
+                    text-align: center;
+                    margin: 30px 0;
+                    border: 3px solid #138808;
+                  "
+                >
+                  <p
+                    style="
+                      color: #ffffff;
+                      font-size: 14px;
+                      font-weight: 500;
+                      margin: 0 0 15px 0;
+                      text-transform: uppercase;
+                      letter-spacing: 1px;
+                    "
+                  >
+                    Your Verification Code
+                  </p>
+
+                  <div
+                    style="
+                      background-color: #ffffff;
+                      border-radius: 8px;
+                      padding: 20px;
+                      margin: 15px 0;
+                      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+                    "
+                  >
+                    <span
+                      style="
+                        font-size: 36px;
+                        font-weight: bold;
+                        color: #333333;
+                        letter-spacing: 8px;
+                        font-family: 'Courier New', monospace;
+                      "
+                      ><%= otp || '123456' %></span
+                    >
+                  </div>
+
+                  <p
+                    style="
+                      color: #ffffff;
+                      font-size: 12px;
+                      margin: 10px 0 0 0;
+                      opacity: 0.9;
+                    "
+                  >
+                    Valid for <%= expiryTime || '10 minutes' %>
+                  </p>
+                </div>
+
+                <!-- Instructions -->
+                <div
+                  style="
+                    background-color: #f8f9fa;
+                    border-left: 4px solid #138808;
+                    padding: 20px;
+                    margin: 30px 0;
+                    border-radius: 0 8px 8px 0;
+                  "
+                >
+                  <h3
+                    style="
+                      color: #333333;
+                      font-size: 16px;
+                      font-weight: 600;
+                      margin: 0 0 10px 0;
+                    "
+                  >
+                    📱 How to use this OTP:
+                  </h3>
+                  <ul
+                    style="
+                      color: #666666;
+                      font-size: 14px;
+                      margin: 0;
+                      padding-left: 20px;
+                    "
+                  >
+                    <li style="margin-bottom: 5px">
+                      Enter this OTP in the verification field
+                    </li>
+                    <li style="margin-bottom: 5px">
+                      Complete the process within <%= expiryTime || '10 minutes'
+                      %>
+                    </li>
+                    <li>Do not share this code with anyone</li>
+                  </ul>
+                </div>
+
+                <!-- Security Notice -->
+                <div
+                  style="
+                    background-color: #fff3cd;
+                    border: 1px solid #ffeaa7;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin: 20px 0;
+                  "
+                >
+                  <p
+                    style="
+                      color: #856404;
+                      font-size: 14px;
+                      margin: 0;
+                      text-align: center;
+                    "
+                  >
+                    🔐 <strong>Security Alert:</strong> If you didn't request
+                    this OTP, please ignore this email and contact our support
+                    team.
+                  </p>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Footer Section -->
+            <tr>
+              <td
+                style="
+                  background-color: #2c3e50;
+                  padding: 30px 20px;
+                  text-align: center;
+                "
+              >
+                <p
+                  style="
+                    color: #ecf0f1;
+                    font-size: 16px;
+                    font-weight: 600;
+                    margin: 0 0 15px 0;
+                  "
+                >
+                  Thanks for choosing Indian Bikes!
+                </p>
+
+                <p
+                  style="
+                    color: #bdc3c7;
+                    font-size: 14px;
+                    margin: 0 0 20px 0;
+                    line-height: 1.5;
+                  "
+                >
+                  Experience the thrill of riding premium Indian motorcycles.
+                  Built for performance, designed for pride.
+                </p>
+
+                <!-- Social Links -->
+                <div style="margin: 20px 0">
+                  <a
+                    href="#"
+                    style="
+                      display: inline-block;
+                      margin: 0 10px;
+                      color: #3498db;
+                      text-decoration: none;
+                      font-size: 14px;
+                    "
+                    >Facebook</a
+                  >
+                  <a
+                    href="#"
+                    style="
+                      display: inline-block;
+                      margin: 0 10px;
+                      color: #3498db;
+                      text-decoration: none;
+                      font-size: 14px;
+                    "
+                    >Instagram</a
+                  >
+                  <a
+                    href="#"
+                    style="
+                      display: inline-block;
+                      margin: 0 10px;
+                      color: #3498db;
+                      text-decoration: none;
+                      font-size: 14px;
+                    "
+                    >Website</a
+                  >
+                </div>
+
+                <!-- Contact Info -->
+                <p
+                  style="
+                    color: #95a5a6;
+                    font-size: 12px;
+                    margin: 20px 0 0 0;
+                    line-height: 1.4;
+                  "
+                >
+                  Indian Bikes Customer Support<br />
+                  📧 support@indianbikes.com | 📞 1800-123-4567<br />
+                  Mumbai, Maharashtra, India
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Mobile Responsive Styles -->
+    <!--[if mso]>
+      <style type="text/css">
+        .mobile-center {
+          text-align: center !important;
+        }
+      </style>
+    <![endif]-->
+
+    <style type="text/css">
+      /* Mobile Styles */
+      @media only screen and (max-width: 600px) {
+        .email-container {
+          width: 100% !important;
+          margin: 0 !important;
+        }
+
+        .content-padding {
+          padding: 20px 15px !important;
+        }
+
+        .otp-text {
+          font-size: 28px !important;
+          letter-spacing: 4px !important;
+        }
+
+        .header-title {
+          font-size: 24px !important;
+        }
+
+        .main-title {
+          font-size: 20px !important;
+        }
+      }
+
+      /* Dark Mode Support */
+      @media (prefers-color-scheme: dark) {
+        .email-body {
+          background-color: #1a1a1a !important;
+        }
+
+        .email-container {
+          background-color: #2d2d2d !important;
+        }
+
+        .content-text {
+          color: #e0e0e0 !important;
+        }
+      }
+    </style>
+  </body>
+</html>

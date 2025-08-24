@@ -21,6 +21,18 @@ export const paymentParamsSchemaZ = z.object({
   transactionId: z.string(),
 });
 
+export const PaymentSchema = z.object({
+  bikeId: z.string(),
+  vehicleNumber: z.string(),
+  userId: z.string(),
+  amount: z.number(),
+  razorpay_order_id: z.string(),
+  razorpay_payment_id: z.string(),
+  status: z.enum(["captured", "failed"]),
+  createdAt: z.preprocess((v) => new Date(v as string), z.date()),
+});
+
+export type Payment = z.infer<typeof PaymentSchema>;
 export type CreatePaymentInput = z.infer<typeof createPaymentSchemaZ>;
 export type PaymentFilterInput = z.infer<typeof paymentFilterSchemaZ>;
 export type PaymentParamsInput = z.infer<typeof paymentParamsSchemaZ>;

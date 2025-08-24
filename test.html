@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test Bike API</title>
+    <style>
+      body {
+        font-family: Arial;
+        margin: 20px;
+      }
+      .bike-entry {
+        margin-bottom: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Create Bike (Test API)</h1>
+
+    <form id="bikeForm">
+      <label
+        >Brand: <input type="text" name="brand" value="Royal Enfield" /></label
+      ><br /><br />
+      <label
+        >Model: <input type="text" name="model" value="Himalayan 411" /></label
+      ><br /><br />
+      <label
+        >Category:
+        <input type="text" name="category" value="motorcycle" /></label
+      ><br /><br />
+      <label>Type: <input type="text" name="type" value="off-road" /></label
+      ><br /><br />
+
+      <label
+        >Availability:
+        <select id="availability">
+          <option value="true">Available</option>
+          <option value="false">Not Available</option>
+        </select> </label
+      ><br /><br />
+
+      <label>Price: <input type="number" id="price" value="1800" /></label
+      ><br /><br />
+
+      <label
+        >Description:
+        <input
+          type="text"
+          name="description"
+          value="A solid off-road adventure bike."
+        /> </label
+      ><br /><br />
+
+      <label
+        >Transmission:
+        <select name="transmission">
+          <option value="gear">Gear</option>
+          <option value="automatic">Automatic</option>
+        </select> </label
+      ><br /><br />
+
+      <label
+        >Image:
+        <input
+          type="file"
+          id="imageFile"
+          name="imageFile"
+          accept="image/*"
+        /> </label
+      ><br /><br />
+
+      <h3>Bikes (Variants)</h3>
+      <div id="bikesContainer"></div>
+      <button type="button" id="addBikeBtn">+ Add Vehicle</button><br /><br />
+
+      <button type="submit">Submit</button>
+    </form>
+
+    <h2>API Response:</h2>
+    <pre id="result"></pre>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const form = document.getElementById("bikeForm");
+        const result = document.getElementById("result");
+        const bikesContainer = document.getElementById("bikesContainer");
+        const addBikeBtn = document.getElementById("addBikeBtn");
+
+        // ✅ Define addBike function BEFORE using it
+        function addBike() {
+          const div = document.createElement("div");
+          div.className = "bike-entry";
+          div.innerHTML = `
+            <label>Vehicle Number: <input type="text" class="vehicleNumber" value="KA01AB1234" /></label><br />
+            <label>Color: <input type="text" class="color" value="Black" /></label><br />
+            <label>Status: <input type="text" class="status" value="available" /></label><br />
+          `;
+          bikesContainer.appendChild(div);
+        }
+
+        // Add first bike entry by default
+        addBike();
+
+        addBikeBtn.addEventListener("click", addBike);
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const formData = new FormData();
+
+          // Convert availability → boolean
+          const availability =
+            document.getElementById("availability").value === "true";
+          formData.append("availability", JSON.stringify(availability));
+
+          // Convert price → number
+          const price = Number(document.getElementById("price").value);
+          formData.append("price", JSON.stringify(price));
+
+          // Collect bikes array
+          const bikes = [];
+          document.querySelectorAll(".bike-entry").forEach((entry) => {
+            bikes.push({
+              vehicleNumber: entry.querySelector(".vehicleNumber").value,
+              color: entry.querySelector(".color").value,
+              status: entry.querySelector(".status").value,
+            });
+          });
+          formData.append("bikes", JSON.stringify(bikes));
+
+          // Other fields
+          formData.append("brand", form.brand.value);
+          formData.append("model", form.model.value);
+          formData.append("category", form.category.value);
+          formData.append("type", form.type.value);
+          formData.append("description", form.description.value);
+          formData.append("transmission", form.transmission.value);
+          formData.append("weekendVariation", 2);
+
+          // Image file
+          const fileInput = document.getElementById("imageFile");
+          if (fileInput.files.length > 0) {
+            formData.append("imageFile", fileInput.files[0]);
+          }
+
+          try {
+            const res = await fetch(
+              "http://localhost:8000/api/bike/create-bike",
+              {
+                method: "POST",
+                body: formData,
+              }
+            );
+            const data = await res.json();
+            result.textContent = JSON.stringify(data, null, 2);
+          } catch (err) {
+            result.textContent = "Error: " + err.message;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

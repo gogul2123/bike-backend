@@ -1,6 +1,7 @@
 import { getCollection } from "../db/database.ts";
 import {
   CreatePaymentInput,
+  Payment,
   PaymentFilterInput,
   paymentParamsSchemaZ,
 } from "./payment.model.ts";
@@ -58,3 +59,8 @@ export async function getAllPayments(
   const { data = [], total = 0 } = result[0] || {};
   return { data, total };
 }
+
+export const savePayment = async (payment: Payment) => {
+  const paymentsCol = await getCollection("payments");
+  await paymentsCol.insertOne(payment);
+};

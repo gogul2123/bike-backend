@@ -3,9 +3,9 @@ import speakeasy from "speakeasy";
 import { envConfig } from "../../config/env.ts";
 const secret = envConfig.speak_easySecret;
 
-export async function sendOtp(mobile: string) {
+export async function sendOtp(gmail: string) {
   const token = speakeasy.totp({
-    secret: mobile,
+    secret: gmail,
     encoding: "base32",
     digits: 6,
     step: 30,
@@ -14,14 +14,15 @@ export async function sendOtp(mobile: string) {
 }
 
 export async function verifyOtp(
-  mobile: string,
+  email: string,
   token: string
 ): Promise<boolean> {
+  console.log(email, token);
   const verified = speakeasy.totp.verify({
-    secret: mobile,
+    secret: email,
     encoding: "base32",
     token,
-    window: 5,
+    window: 1,
   });
   return verified;
 }

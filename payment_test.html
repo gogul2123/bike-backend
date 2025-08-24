@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bike Booking Payment Test</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        max-width: 500px;
+        width: 100%;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #4caf50, #45a049);
+        color: white;
+        padding: 30px 20px;
+        text-align: center;
+      }
+
+      .header h1 {
+        margin-bottom: 10px;
+        font-size: 28px;
+      }
+
+      .header p {
+        opacity: 0.9;
+      }
+
+      .form-section {
+        padding: 30px;
+      }
+
+      .form-group {
+        margin-bottom: 25px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 15px;
+        border: 2px solid #e1e5e9;
+        border-radius: 10px;
+        font-size: 16px;
+        transition: border-color 0.3s ease;
+      }
+
+      input[type="text"]:focus,
+      input[type="number"]:focus,
+      select:focus {
+        outline: none;
+        border-color: #4caf50;
+        box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+      }
+
+      .bike-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 25px;
+      }
+
+      .bike-info h3 {
+        color: #333;
+        margin-bottom: 10px;
+      }
+
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+        padding: 5px 0;
+      }
+
+      .amount-display {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4caf50;
+        text-align: center;
+        padding: 20px;
+        background: #f0f8f0;
+        border-radius: 10px;
+        margin-bottom: 25px;
+      }
+
+      .btn {
+        width: 100%;
+        padding: 18px;
+        background: linear-gradient(135deg, #4caf50, #45a049);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 18px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+      }
+
+      .btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .status-page {
+        display: none;
+        text-align: center;
+        padding: 50px 30px;
+      }
+
+      .success-icon {
+        font-size: 80px;
+        color: #4caf50;
+        margin-bottom: 20px;
+      }
+
+      .failure-icon {
+        font-size: 80px;
+        color: #f44336;
+        margin-bottom: 20px;
+      }
+
+      .status-title {
+        font-size: 28px;
+        margin-bottom: 15px;
+        font-weight: 600;
+      }
+
+      .success-title {
+        color: #4caf50;
+      }
+
+      .failure-title {
+        color: #f44336;
+      }
+
+      .status-message {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 30px;
+        line-height: 1.5;
+      }
+
+      .transaction-details {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 25px;
+        text-align: left;
+      }
+
+      .btn-secondary {
+        background: linear-gradient(135deg, #6c757d, #5a6268);
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 30px;
+      }
+
+      .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #4caf50;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Booking Form -->
+      <div id="bookingForm">
+        <div class="header">
+          <h1>🏍️ Book Your Bike</h1>
+          <p>Complete your booking with secure payment</p>
+        </div>
+
+        <div class="form-section">
+          <form id="bikeBookingForm">
+            <div class="form-group">
+              <label for="bikeId">Select Bike:</label>
+              <select id="bikeId" required>
+                <option value="">Choose a bike</option>
+                <option value="BIKE1756029137543000">
+                  Honda Activa 6G - ₹500/day
+                </option>
+                <option value="bike002">TVS Jupiter - ₹450/day</option>
+                <option value="bike003">Hero Splendor Plus - ₹400/day</option>
+                <option value="bike004">Yamaha FZS - ₹800/day</option>
+                <option value="bike005">Bajaj Pulsar 150 - ₹750/day</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="vehicleNumber">Vehicle Number:</label>
+              <input
+                type="text"
+                id="vehicleNumber"
+                placeholder="e.g., TN01AB1234"
+                value="KA01AB1234"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="userId">User ID:</label>
+              <input
+                type="text"
+                id="userId"
+                value="USR1754833148052000"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="days">Number of Days:</label>
+              <input
+                type="number"
+                id="days"
+                min="1"
+                max="30"
+                value="1"
+                required
+              />
+            </div>
+
+            <div class="bike-info" id="bikeInfo" style="display: none">
+              <h3>Booking Summary</h3>
+              <div class="info-row">
+                <span>Bike Model:</span>
+                <span id="selectedBikeName"></span>
+              </div>
+              <div class="info-row">
+                <span>Vehicle Number:</span>
+                <span id="displayVehicleNumber"></span>
+              </div>
+              <div class="info-row">
+                <span>Daily Rate:</span>
+                <span id="dailyRate"></span>
+              </div>
+              <div class="info-row">
+                <span>Duration:</span>
+                <span id="displayDays"></span>
+              </div>
+            </div>
+
+            <div class="amount-display" id="amountDisplay">
+              Total Amount: ₹<span id="totalAmount">0</span>
+            </div>
+
+            <button type="submit" class="btn" id="payNowBtn">
+              Pay Now & Book Bike
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loadingState" class="loading">
+        <div class="spinner"></div>
+        <h3>Processing your payment...</h3>
+        <p>Please wait while we confirm your booking</p>
+      </div>
+
+      <!-- Success Page -->
+      <div id="successPage" class="status-page">
+        <div class="success-icon">✅</div>
+        <h2 class="status-title success-title">Booking Confirmed!</h2>
+        <p class="status-message">
+          Your bike has been successfully booked. You'll receive a confirmation
+          email shortly.
+        </p>
+
+        <div class="transaction-details">
+          <h3>Booking Details</h3>
+          <div class="info-row">
+            <span>Transaction ID:</span>
+            <span id="successTransactionId">-</span>
+          </div>
+          <div class="info-row">
+            <span>Bike Model:</span>
+            <span id="successBikeModel">-</span>
+          </div>
+          <div class="info-row">
+            <span>Vehicle Number:</span>
+            <span id="successVehicleNumber">-</span>
+          </div>
+          <div class="info-row">
+            <span>Amount Paid:</span>
+            <span id="successAmount">-</span>
+          </div>
+        </div>
+
+        <button onclick="resetForm()" class="btn">Book Another Bike</button>
+      </div>
+
+      <!-- Failure Page -->
+      <div id="failurePage" class="status-page">
+        <div class="failure-icon">❌</div>
+        <h2 class="status-title failure-title">Payment Failed</h2>
+        <p class="status-message">
+          Sorry, we couldn't process your payment. Please try again or contact
+          support if the issue persists.
+        </p>
+
+        <div class="transaction-details">
+          <h3>Error Details</h3>
+          <div class="info-row">
+            <span>Error:</span>
+            <span id="errorMessage">Payment processing failed</span>
+          </div>
+          <div class="info-row">
+            <span>Suggested Action:</span>
+            <span>Try again or use a different payment method</span>
+          </div>
+        </div>
+
+        <button onclick="resetForm()" class="btn">Try Again</button>
+        <button
+          onclick="window.location.href='mailto:support@bikebooking.com'"
+          class="btn btn-secondary"
+          style="margin-top: 10px"
+        >
+          Contact Support
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // Configuration
+      const API_BASE_URL = "http://localhost:8000/api"; // Change this to your API URL
+      const RAZORPAY_KEY = "rzp_test_RZ4yu67jLQUpuF"; // Your Razorpay test key
+
+      // Bike pricing data
+      const bikeData = {
+        BIKE1756029137543000: { name: "Honda Activa 6G", price: 500 },
+        bike002: { name: "TVS Jupiter", price: 450 },
+        bike003: { name: "Hero Splendor Plus", price: 400 },
+        bike004: { name: "Yamaha FZS", price: 800 },
+        bike005: { name: "Bajaj Pulsar 150", price: 750 },
+      };
+
+      // DOM elements
+      const bikeSelect = document.getElementById("bikeId");
+      const vehicleNumberInput = document.getElementById("vehicleNumber");
+      const userIdInput = document.getElementById("userId");
+      const daysInput = document.getElementById("days");
+      const bikeInfo = document.getElementById("bikeInfo");
+      const totalAmountSpan = document.getElementById("totalAmount");
+      const form = document.getElementById("bikeBookingForm");
+
+      // Update booking summary
+      function updateBookingSummary() {
+        const selectedBikeId = bikeSelect.value;
+        const vehicleNumber = vehicleNumberInput.value;
+        const days = parseInt(daysInput.value) || 1;
+
+        if (selectedBikeId && bikeData[selectedBikeId]) {
+          const bike = bikeData[selectedBikeId];
+          const totalAmount = bike.price * days;
+
+          document.getElementById("selectedBikeName").textContent = bike.name;
+          document.getElementById("displayVehicleNumber").textContent =
+            vehicleNumber || "Not entered";
+          document.getElementById("dailyRate").textContent = `₹${bike.price}`;
+          document.getElementById("displayDays").textContent = `${days} day(s)`;
+          totalAmountSpan.textContent = totalAmount;
+
+          bikeInfo.style.display = "block";
+        } else {
+          bikeInfo.style.display = "none";
+          totalAmountSpan.textContent = "0";
+        }
+      }
+
+      // Event listeners
+      bikeSelect.addEventListener("change", updateBookingSummary);
+      vehicleNumberInput.addEventListener("input", updateBookingSummary);
+      daysInput.addEventListener("input", updateBookingSummary);
+
+      // Form submission
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const formData = {
+          bikeId: bikeSelect.value,
+          vehicleNumber: vehicleNumberInput.value,
+          userId: userIdInput.value,
+          amount: parseInt(totalAmountSpan.textContent),
+        };
+
+        if (
+          !formData.bikeId ||
+          !formData.vehicleNumber ||
+          !formData.userId ||
+          !formData.amount
+        ) {
+          console.log(
+            formData.bikeId,
+            formData.vehicleNumber,
+            formData.userId,
+            formData.amount
+          );
+          alert("Please fill all required fields");
+          return;
+        }
+
+        await processPayment(formData);
+      });
+
+      // Process payment
+      async function processPayment(bookingData) {
+        try {
+          showLoading();
+
+          // Create order
+          const orderResponse = await fetch(
+            `${API_BASE_URL}/booking/create-order`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(bookingData),
+            }
+          );
+
+          if (!orderResponse.ok) {
+            throw new Error("Failed to create order");
+          }
+
+          const orderData = await orderResponse.json();
+
+          hideLoading();
+
+          // Initialize Razorpay
+          const options = {
+            key: orderData.data.razorpayKey || RAZORPAY_KEY,
+            amount: bookingData.amount * 100, // Amount in paise
+            currency: "INR",
+            name: "Bike Booking Service",
+            description: `Booking for ${bikeData[bookingData.bikeId].name}`,
+            order_id: orderData.data.orderId,
+            handler: function (response) {
+              verifyPayment(response, bookingData);
+            },
+            prefill: {
+              name: "Test User",
+              email: "test@example.com",
+              contact: "9999999999",
+            },
+            theme: {
+              color: "#4CAF50",
+            },
+            modal: {
+              ondismiss: function () {
+                console.log("Payment cancelled by user");
+              },
+            },
+          };
+
+          const rzp = new Razorpay(options);
+          rzp.open();
+        } catch (error) {
+          console.error("Payment processing error:", error);
+          hideLoading();
+          showFailure(error.message);
+        }
+      }
+
+      // Verify payment
+      async function verifyPayment(response, bookingData) {
+        try {
+          showLoading();
+
+          const verificationData = {
+            ...bookingData,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          };
+
+          const verifyResponse = await fetch(
+            `${API_BASE_URL}/booking/verify-payment`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(verificationData),
+            }
+          );
+
+          hideLoading();
+
+          if (verifyResponse.ok) {
+            showSuccess(response.razorpay_payment_id, bookingData);
+          } else {
+            showFailure("Payment verification failed");
+          }
+        } catch (error) {
+          console.error("Payment verification error:", error);
+          hideLoading();
+          showFailure("Payment verification failed");
+        }
+      }
+
+      // UI State Management
+      function showLoading() {
+        document.getElementById("bookingForm").style.display = "none";
+        document.getElementById("loadingState").style.display = "block";
+        document.getElementById("successPage").style.display = "none";
+        document.getElementById("failurePage").style.display = "none";
+      }
+
+      function hideLoading() {
+        document.getElementById("loadingState").style.display = "none";
+      }
+
+      function showSuccess(transactionId, bookingData) {
+        document.getElementById("bookingForm").style.display = "none";
+        document.getElementById("loadingState").style.display = "none";
+        document.getElementById("successPage").style.display = "block";
+        document.getElementById("failurePage").style.display = "none";
+
+        // Update success page details
+        document.getElementById("successTransactionId").textContent =
+          transactionId;
+        document.getElementById("successBikeModel").textContent =
+          bikeData[bookingData.bikeId].name;
+        document.getElementById("successVehicleNumber").textContent =
+          bookingData.vehicleNumber;
+        document.getElementById(
+          "successAmount"
+        ).textContent = `₹${bookingData.amount}`;
+      }
+
+      function showFailure(errorMessage = "Payment processing failed") {
+        document.getElementById("bookingForm").style.display = "none";
+        document.getElementById("loadingState").style.display = "none";
+        document.getElementById("successPage").style.display = "none";
+        document.getElementById("failurePage").style.display = "block";
+
+        document.getElementById("errorMessage").textContent = errorMessage;
+      }
+
+      function resetForm() {
+        document.getElementById("bookingForm").style.display = "block";
+        document.getElementById("successPage").style.display = "none";
+        document.getElementById("failurePage").style.display = "none";
+        document.getElementById("loadingState").style.display = "none";
+
+        // Reset form
+        form.reset();
+        userIdInput.value = "user_12345";
+        daysInput.value = "1";
+        bikeInfo.style.display = "none";
+        totalAmountSpan.textContent = "0";
+      }
+
+      // Initialize
+      updateBookingSummary();
+    </script>
+  </body>
+</html>
