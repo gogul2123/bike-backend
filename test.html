@@ -5,160 +5,550 @@
     <title>Test Bike API</title>
     <style>
       body {
-        font-family: Arial;
+        font-family: Arial, sans-serif;
         margin: 20px;
+        max-width: 1200px;
       }
-      .bike-entry {
-        margin-bottom: 10px;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+      fieldset {
+        margin-bottom: 15px;
+        padding: 15px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+      }
+      legend {
+        font-weight: bold;
+        color: #333;
+        padding: 0 10px;
+      }
+      .vehicle-entry {
+        margin-bottom: 15px;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        max-width: 300px;
+        padding: 6px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      input[type="checkbox"] {
+        width: auto;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        margin: 5px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      #addVehicleBtn {
+        background-color: #28a745;
+      }
+      #addVehicleBtn:hover {
+        background-color: #1e7e34;
+      }
+      .remove-vehicle {
+        background-color: #dc3545;
+        float: right;
+        padding: 5px 10px;
+        font-size: 12px;
+      }
+      .remove-vehicle:hover {
+        background-color: #c82333;
+      }
+      #result {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 4px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .form-row {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .form-row label {
+        margin-bottom: 0;
       }
     </style>
   </head>
   <body>
-    <h1>Create Bike (Test API)</h1>
+    <h1>Create Bike API Test - Pre-filled Sample Data</h1>
 
-    <form id="bikeForm">
-      <label
-        >Brand: <input type="text" name="brand" value="Royal Enfield" /></label
-      ><br /><br />
-      <label
-        >Model: <input type="text" name="model" value="Himalayan 411" /></label
-      ><br /><br />
-      <label
-        >Category:
-        <input type="text" name="category" value="motorcycle" /></label
-      ><br /><br />
-      <label>Type: <input type="text" name="type" value="off-road" /></label
-      ><br /><br />
+    <form id="bikeForm" enctype="multipart/form-data">
+      <!-- Bike ID -->
+      <div class="form-row">
+        <label>
+          Bike ID:
+          <input
+            type="text"
+            name="bikeId"
+            value="BIKE_RE_HIM_2024_001"
+            required
+          />
+        </label>
+      </div>
+      <br />
 
-      <label
-        >Availability:
-        <select id="availability">
-          <option value="true">Available</option>
-          <option value="false">Not Available</option>
-        </select> </label
-      ><br /><br />
+      <!-- Model Info -->
+      <fieldset>
+        <legend>Model Information</legend>
+        <div class="form-row">
+          <label>
+            Brand:
+            <input name="modelInfo.brand" value="Royal Enfield" required />
+          </label>
+          <label>
+            Model:
+            <input name="modelInfo.model" value="Himalayan 411" required />
+          </label>
+        </div>
+        <br />
 
-      <label>Price: <input type="number" id="price" value="1800" /></label
-      ><br /><br />
+        <div class="form-row">
+          <label>
+            Category:
+            <input name="modelInfo.category" value="motorcycle" required />
+          </label>
+          <label>
+            Type:
+            <input name="modelInfo.type" value="adventure" required />
+          </label>
+        </div>
+        <br />
 
-      <label
-        >Description:
-        <input
-          type="text"
-          name="description"
-          value="A solid off-road adventure bike."
-        /> </label
-      ><br /><br />
+        <div class="form-row">
+          <label>
+            Transmission:
+            <select name="modelInfo.transmission" required>
+              <option value="gear" selected>Gear</option>
+              <option value="automatic">Automatic</option>
+            </select>
+          </label>
+          <label>
+            Image URL (optional):
+            <input
+              name="modelInfo.imageUrl"
+              value="https://example.com/himalayan-image.jpg"
+            />
+          </label>
+        </div>
+        <br />
 
-      <label
-        >Transmission:
-        <select name="transmission">
-          <option value="gear">Gear</option>
-          <option value="automatic">Automatic</option>
-        </select> </label
-      ><br /><br />
+        <label>
+          Description:
+          <textarea name="modelInfo.description" rows="3">
+A versatile adventure motorcycle designed for both on-road and off-road adventures. Perfect for long touring and mountain rides.</textarea
+          >
+        </label>
+        <br />
 
-      <label
-        >Image:
-        <input
-          type="file"
-          id="imageFile"
-          name="imageFile"
-          accept="image/*"
-        /> </label
-      ><br /><br />
+        <!-- Specifications -->
+        <fieldset>
+          <legend>Specifications</legend>
+          <div class="form-row">
+            <label>
+              Engine:
+              <input
+                name="modelInfo.specifications.engine"
+                value="411cc Single Cylinder"
+              />
+            </label>
+            <label>
+              Mileage:
+              <input
+                name="modelInfo.specifications.mileage"
+                value="30-35 kmpl"
+              />
+            </label>
+          </div>
+          <br />
 
-      <h3>Bikes (Variants)</h3>
-      <div id="bikesContainer"></div>
-      <button type="button" id="addBikeBtn">+ Add Vehicle</button><br /><br />
+          <div class="form-row">
+            <label>
+              Fuel Type:
+              <input name="modelInfo.specifications.fuelType" value="Petrol" />
+            </label>
+            <label>
+              Weight:
+              <input name="modelInfo.specifications.weight" value="199 kg" />
+            </label>
+          </div>
+          <br />
 
-      <button type="submit">Submit</button>
+          <label>
+            Top Speed:
+            <input name="modelInfo.specifications.topSpeed" value="140 kmph" />
+          </label>
+        </fieldset>
+      </fieldset>
+
+      <!-- Pricing Info -->
+      <fieldset>
+        <legend>Pricing Information</legend>
+        <div class="form-row">
+          <label>
+            Base Price (per day):
+            <input
+              type="number"
+              name="pricing.basePrice"
+              value="2500"
+              required
+            />
+          </label>
+          <label>
+            Weekend Multiplier:
+            <input
+              type="number"
+              step="0.1"
+              name="pricing.weekendMultiplier"
+              value="1.8"
+            />
+          </label>
+        </div>
+        <br />
+
+        <div class="form-row">
+          <label>
+            Currency:
+            <input name="pricing.currency" value="INR" />
+          </label>
+          <label>
+            Tax Included:
+            <input type="checkbox" name="pricing.taxIncluded" checked />
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Image File Upload -->
+      <fieldset>
+        <legend>Image Upload</legend>
+        <label>
+          Upload Bike Image (Required):
+          <input type="file" name="imageFile" accept="image/*" required />
+        </label>
+        <small style="color: #666"
+          >Please select an image file to proceed with bike creation.</small
+        >
+      </fieldset>
+
+      <!-- Vehicles Array -->
+      <fieldset>
+        <legend>Vehicle Variants</legend>
+        <div id="vehiclesContainer"></div>
+        <button type="button" id="addVehicleBtn">+ Add Another Vehicle</button>
+      </fieldset>
+
+      <br />
+      <button type="submit">Create Bike</button>
+      <button type="button" onclick="location.reload()">Reset Form</button>
     </form>
 
     <h2>API Response:</h2>
-    <pre id="result"></pre>
+    <pre id="result">Response will appear here...</pre>
 
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        const form = document.getElementById("bikeForm");
-        const result = document.getElementById("result");
-        const bikesContainer = document.getElementById("bikesContainer");
-        const addBikeBtn = document.getElementById("addBikeBtn");
+        const vehiclesContainer = document.getElementById("vehiclesContainer");
+        const addVehicleBtn = document.getElementById("addVehicleBtn");
 
-        // ✅ Define addBike function BEFORE using it
-        function addBike() {
+        let vehicleCount = 0;
+
+        // Sample data for vehicles
+        const sampleVehicles = [
+          {
+            vehicleNumber: "KA01AB1234",
+            status: "AVAILABLE",
+            condition: "EXCELLENT",
+            location: "Bangalore Main Branch",
+            holdExpiryTime: "2024-08-28T15:30:00",
+            lastServiceDate: "2024-07-15",
+            nextServiceDue: "2024-10-15",
+            totalKms: 15000,
+            purchaseDate: "2023-05-20",
+          },
+          {
+            vehicleNumber: "KA02CD5678",
+            status: "AVAILABLE",
+            condition: "GOOD",
+            location: "Bangalore HSR Branch",
+            holdExpiryTime: "",
+            lastServiceDate: "2024-06-10",
+            nextServiceDue: "2024-09-10",
+            totalKms: 22000,
+            purchaseDate: "2023-03-15",
+          },
+        ];
+
+        function addVehicleEntry(sampleData = null) {
+          const idx = vehicleCount++;
+          const data = sampleData || sampleVehicles[0]; // Use sample data or default
+
           const div = document.createElement("div");
-          div.className = "bike-entry";
+          div.className = "vehicle-entry";
           div.innerHTML = `
-            <label>Vehicle Number: <input type="text" class="vehicleNumber" value="KA01AB1234" /></label><br />
-            <label>Color: <input type="text" class="color" value="Black" /></label><br />
-            <label>Status: <input type="text" class="status" value="available" /></label><br />
+            <button type="button" class="remove-vehicle" onclick="this.parentElement.remove()">Remove</button>
+            <h4>Vehicle ${idx + 1}</h4>
+            
+            <div class="form-row">
+              <label>
+                Vehicle Number:
+                <input name="vehicles.${idx}.vehicleNumber" value="${
+            data.vehicleNumber || "KA03EF" + (9000 + idx)
+          }" required />
+              </label>
+              <label>
+                Status:
+                <select name="vehicles.${idx}.status">
+                  <option value="AVAILABLE" ${
+                    data.status === "AVAILABLE" ? "selected" : ""
+                  }>Available</option>
+                  <option value="RENTED" ${
+                    data.status === "RENTED" ? "selected" : ""
+                  }>Rented</option>
+                  <option value="MAINTENANCE" ${
+                    data.status === "MAINTENANCE" ? "selected" : ""
+                  }>Maintenance</option>
+                  <option value="OUT_OF_SERVICE" ${
+                    data.status === "OUT_OF_SERVICE" ? "selected" : ""
+                  }>Out of Service</option>
+                </select>
+              </label>
+            </div>
+            <br />
+            
+            <div class="form-row">
+              <label>
+                Condition:
+                <select name="vehicles.${idx}.condition">
+                  <option value="EXCELLENT" ${
+                    data.condition === "EXCELLENT" ? "selected" : ""
+                  }>Excellent</option>
+                  <option value="GOOD" ${
+                    data.condition === "GOOD" ? "selected" : ""
+                  }>Good</option>
+                  <option value="FAIR" ${
+                    data.condition === "FAIR" ? "selected" : ""
+                  }>Fair</option>
+                  <option value="POOR" ${
+                    data.condition === "POOR" ? "selected" : ""
+                  }>Poor</option>
+                </select>
+              </label>
+              <label>
+                Location:
+                <input name="vehicles.${idx}.location" value="${
+            data.location || "Main Branch"
+          }" />
+              </label>
+            </div>
+            <br />
+
+            <fieldset>
+              <legend>Metadata</legend>
+              <div class="form-row">
+                <label>
+                  Hold Expiry Time:
+                  <input type="datetime-local" name="vehicles.${idx}.metadata.holdExpiryTime" value="${
+            data.holdExpiryTime || ""
+          }" />
+                </label>
+                <label>
+                  Last Service Date:
+                  <input type="date" name="vehicles.${idx}.metadata.lastServiceDate" value="${
+            data.lastServiceDate || "2024-07-01"
+          }" />
+                </label>
+              </div>
+              <br />
+              
+              <div class="form-row">
+                <label>
+                  Next Service Due:
+                  <input type="date" name="vehicles.${idx}.metadata.nextServiceDue" value="${
+            data.nextServiceDue || "2024-10-01"
+          }" />
+                </label>
+                <label>
+                  Total KMs:
+                  <input type="number" min="0" name="vehicles.${idx}.metadata.totalKms" value="${
+            data.totalKms || 10000
+          }" />
+                </label>
+              </div>
+              <br />
+              
+              <label>
+                Purchase Date:
+                <input type="date" name="vehicles.${idx}.metadata.purchaseDate" value="${
+            data.purchaseDate || "2023-01-15"
+          }" />
+              </label>
+            </fieldset>
           `;
-          bikesContainer.appendChild(div);
+          vehiclesContainer.appendChild(div);
         }
 
-        // Add first bike entry by default
-        addBike();
+        addVehicleBtn.addEventListener("click", () => addVehicleEntry());
 
-        addBikeBtn.addEventListener("click", addBike);
+        // Add initial vehicles with sample data
+        sampleVehicles.forEach((vehicle) => addVehicleEntry(vehicle));
 
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
+        // Convert dot notation form data to nested JSON
+        function formDataToJSON(formData) {
+          const obj = {};
 
-          const formData = new FormData();
+          for (let [key, value] of formData.entries()) {
+            if (key === "imageFile") continue; // Skip file, handle separately
 
-          // Convert availability → boolean
-          const availability =
-            document.getElementById("availability").value === "true";
-          formData.append("availability", JSON.stringify(availability));
+            // Convert checkbox values
+            if (value === "on") value = true;
 
-          // Convert price → number
-          const price = Number(document.getElementById("price").value);
-          formData.append("price", JSON.stringify(price));
+            // Convert numeric strings to numbers for specific fields
+            if (
+              key.includes("basePrice") ||
+              key.includes("weekendMultiplier") ||
+              key.includes("totalKms")
+            ) {
+              const numValue = parseFloat(value);
+              if (!isNaN(numValue)) value = numValue;
+            }
 
-          // Collect bikes array
-          const bikes = [];
-          document.querySelectorAll(".bike-entry").forEach((entry) => {
-            bikes.push({
-              vehicleNumber: entry.querySelector(".vehicleNumber").value,
-              color: entry.querySelector(".color").value,
-              status: entry.querySelector(".status").value,
-            });
-          });
-          formData.append("bikes", JSON.stringify(bikes));
+            // Convert boolean strings
+            if (value === "true") value = true;
+            if (value === "false") value = false;
 
-          // Other fields
-          formData.append("brand", form.brand.value);
-          formData.append("model", form.model.value);
-          formData.append("category", form.category.value);
-          formData.append("type", form.type.value);
-          formData.append("description", form.description.value);
-          formData.append("transmission", form.transmission.value);
-          formData.append("weekendVariation", 2);
-
-          // Image file
-          const fileInput = document.getElementById("imageFile");
-          if (fileInput.files.length > 0) {
-            formData.append("imageFile", fileInput.files[0]);
-          }
-
-          try {
-            const res = await fetch(
-              "http://localhost:8000/api/bike/create-bike",
-              {
-                method: "POST",
-                body: formData,
+            const keys = key.replace(/\[(\d+)\]/g, ".$1").split(".");
+            keys.reduce((acc, k, i) => {
+              if (i === keys.length - 1) {
+                acc[k] = value;
+              } else {
+                if (!acc[k]) {
+                  acc[k] = isNaN(keys[i + 1]) ? {} : [];
+                }
+                return acc[k];
               }
-            );
-            const data = await res.json();
-            result.textContent = JSON.stringify(data, null, 2);
-          } catch (err) {
-            result.textContent = "Error: " + err.message;
+              return acc;
+            }, obj);
           }
-        });
+
+          return obj;
+        }
+
+        document
+          .getElementById("bikeForm")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            // Check if file is selected
+            const fileInput = formData.get("imageFile");
+            if (!fileInput || fileInput.size === 0) {
+              alert("Please select an image file before submitting.");
+              return;
+            }
+
+            // Convert form data to JSON (excluding file)
+            const jsonData = formDataToJSON(formData);
+
+            // Debug: Log the structure
+            console.log(
+              "JSON Data Structure:",
+              JSON.stringify(jsonData, null, 2)
+            );
+
+            try {
+              document.getElementById("result").textContent =
+                "Sending request with file...\n\nData being sent:\n" +
+                JSON.stringify(jsonData, null, 2);
+
+              // Create FormData for multipart upload
+              const uploadData = new FormData();
+
+              // Add all the JSON data fields individually to FormData
+              const addToFormData = (obj, prefix = "") => {
+                Object.keys(obj).forEach((key) => {
+                  const value = obj[key];
+                  const formKey = prefix ? `${prefix}.${key}` : key;
+
+                  if (
+                    value !== null &&
+                    typeof value === "object" &&
+                    !Array.isArray(value)
+                  ) {
+                    // Recursive for nested objects
+                    addToFormData(value, formKey);
+                  } else if (Array.isArray(value)) {
+                    // Handle arrays
+                    value.forEach((item, index) => {
+                      if (typeof item === "object" && item !== null) {
+                        addToFormData(item, `${formKey}.${index}`);
+                      } else {
+                        uploadData.append(`${formKey}.${index}`, item);
+                      }
+                    });
+                  } else {
+                    uploadData.append(formKey, value);
+                  }
+                });
+              };
+
+              addToFormData(jsonData);
+
+              // Add the file
+              uploadData.append("imageFile", fileInput);
+
+              // Log what's being sent
+              console.log("FormData entries:");
+              for (let pair of uploadData.entries()) {
+                console.log(pair[0], pair[1]);
+              }
+
+              const res = await fetch(
+                "http://localhost:8000/api/bike/createBike",
+                {
+                  method: "POST",
+                  body: uploadData, // Send as multipart/form-data
+                }
+              );
+
+              const data = await res.json();
+              document.getElementById("result").textContent =
+                "Response:\n" + JSON.stringify(data, null, 2);
+
+              if (res.ok) {
+                alert("Bike created successfully!");
+              } else {
+                alert("Error: " + (data.message || "Unknown error"));
+              }
+            } catch (err) {
+              const errorMsg = "Network Error: " + err.message;
+              document.getElementById("result").textContent = errorMsg;
+              alert(errorMsg);
+            }
+          });
       });
     </script>
   </body>

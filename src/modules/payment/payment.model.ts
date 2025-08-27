@@ -22,8 +22,7 @@ export const paymentParamsSchemaZ = z.object({
 });
 
 export const PaymentSchema = z.object({
-  bikeId: z.string(),
-  vehicleNumber: z.string(),
+  bookingId: z.string(),
   userId: z.string(),
   amount: z.number(),
   razorpay_order_id: z.string(),
