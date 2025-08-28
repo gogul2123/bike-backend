@@ -15,43 +15,54 @@ import {
   healthCheck,
 } from "./booking.controller.ts";
 import {
+  BookingById,
   BookingQueryInput,
+  BookingSchema,
   BookingVehicleSchema,
   CancelBookingInput,
+  completeBookingSchema,
+  CreateBookingInput,
   getBookingsByStatusSchema,
   getUserBookingsSchema,
   UpdateBookingInput,
 } from "./booking.model.ts";
+import { BookingVehicleInput } from "../bike/bike.model.ts";
 
 const router = Router();
 
 // Public routes
 router.post(
   "/create-order",
-  validateZod(BookingVehicleSchema),
+  validateZod(CreateBookingInput),
   createBookingOrder
 );
 router.get("/health", healthCheck);
 
 // Protected routes (require authentication)
-router.get("/:bookingId", getBooking);
-router.get("/", validateZod(BookingQueryInput), getBookings);
+router.get("/getBooking/:bookingId", validateZod(BookingById), getBooking);
+
 router.get(
-  "/user/:userId",
+  "/getBookingsByuser/:userId",
   validateZod(getUserBookingsSchema),
   getUserBookings
 );
 router.get(
-  "/status/:status",
+  "/getBookingStatus/:status",
   validateZod(getBookingsByStatusSchema),
   getBookingsByStatus
 );
-router.put("/update", validateZod(UpdateBookingInput), updateBooking);
-router.post("/cancel", validateZod(CancelBookingInput), cancelBooking);
+router.post(
+  "/confirmBooking",
+  validateZod(completeBookingSchema),
+  verifyPayment
+);
+router.put("/updateBooking", validateZod(UpdateBookingInput), updateBooking);
+router.post("/cancelBooking", validateZod(CancelBookingInput), cancelBooking);
 
 // Admin routes
 router.post("/cleanup-holds", cleanupExpiredHolds);
 router.post("/activate-bookings", activateBookings);
 router.post("/complete-bookings", completeBookings);
+router.get("/getAllBookings", validateZod(BookingQueryInput), getBookings);
 
 export default router;

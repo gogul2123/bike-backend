@@ -64,3 +64,17 @@ export const savePayment = async (payment: Payment) => {
   const paymentsCol = await getCollection("payments");
   await paymentsCol.insertOne(payment);
 };
+
+export const updatePayment = async (
+  bookingId: string,
+  status: Payment["status"],
+  razorpay_payment_id: Payment["razorpay_payment_id"]
+) => {
+  const paymentsCol = await getCollection("payments");
+  await paymentsCol.updateOne(
+    {
+      bookingId: bookingId,
+    },
+    { $set: { status, razorpay_payment_id } }
+  );
+};

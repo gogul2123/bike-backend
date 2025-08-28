@@ -22,13 +22,16 @@ export const paymentParamsSchemaZ = z.object({
 });
 
 export const PaymentSchema = z.object({
+  paymentId: z.string(),
   bookingId: z.string(),
   userId: z.string(),
   amount: z.number(),
   razorpay_order_id: z.string(),
   razorpay_payment_id: z.string(),
-  status: z.enum(["captured", "failed"]),
+  paymentMode: z.string().optional(),
+  status: z.enum(["captured", "failed", "refunded", "pending"]),
   createdAt: z.preprocess((v) => new Date(v as string), z.date()),
+  updatedAt: z.preprocess((v) => new Date(v as string), z.date()),
 });
 
 export type Payment = z.infer<typeof PaymentSchema>;

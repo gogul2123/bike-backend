@@ -21,6 +21,10 @@ export const BookingVehicleSchema = z.object({
   currency: z.string().default("INR"),
 });
 
+export const BookingById = z.object({
+  bookingId: z.string().min(1, "BookingId is required"),
+});
+
 export const ItemPricingBreakdownSchema = z.object({
   bikeId: z.string().min(1),
   vehicleNumber: z.string().min(1),
@@ -32,9 +36,9 @@ export const ItemPricingBreakdownSchema = z.object({
 });
 
 export const PricingBreakdownSchema = z.object({
-  items: z
-    .array(ItemPricingBreakdownSchema)
-    .min(1, "At least one item is required"),
+  // items: z
+  //   .array(ItemPricingBreakdownSchema)
+  //   .min(1, "At least one item is required"),
   totalBaseAmount: z.number().nonnegative(),
   totalWeekendAmount: z.number().nonnegative(),
   subtotalAmount: z.number().positive(),
@@ -49,7 +53,7 @@ export const PricingBreakdownSchema = z.object({
 
 export const BookingSchema = z
   .object({
-    bookingId: z.string().min(1, "BookingId is required"),
+    bookingId: z.string().min(1, "BookingId is required").optional(),
     userId: z.string().min(1, "UserId is required"),
     vehicles: z
       .array(BookingVehicleSchema)
@@ -64,19 +68,6 @@ export const BookingSchema = z
     ),
     totalDays: z.number().positive().optional(),
     pricing: PricingBreakdownSchema,
-    payment: z.object({
-      orderId: z.string().optional(),
-      paymentId: z.string().optional(),
-      paymentStatus: z.enum(paymentStatus).default("PENDING"),
-      paymentMethod: z.string().optional(),
-      transactionDate: z.preprocess(
-        (v) => (v ? new Date(v as string) : undefined),
-        z.date().optional()
-      ),
-      razorpayOrderId: z.string().optional(),
-      razorpayPaymentId: z.string().optional(),
-      razorpaySignature: z.string().optional(),
-    }),
     bookingStatus: z.enum(bookingStatus).default("INITIATED"),
     features: z
       .object({
@@ -144,16 +135,16 @@ export const BookingSchema = z
       message: "All vehicle numbers must be unique in a booking",
       path: ["vehicles"],
     }
-  )
-  .refine(
-    (data) => {
-      return data.pricing.items.length === data.vehicles.length;
-    },
-    {
-      message: "Pricing items must match the number of vehicles",
-      path: ["pricing"],
-    }
   );
+// .refine(
+//   (data) => {
+//     return data.pricing.items.length === data.vehicles.length;
+//   },
+//   {
+//     message: "Pricing items must match the number of vehicles",
+//     path: ["pricing"],
+//   }
+// );
 
 export const CreateBookingInput = z
   .object({
@@ -255,6 +246,13 @@ export const BookingQueryInput = z.object({
   vehicleNumber: z.string().optional(),
   page: z.number().positive().default(1),
   limit: z.number().positive().max(100).default(10),
+});
+
+export const completeBookingSchema = z.object({
+  bookingId: z.string().min(1, "BookingId is required"),
+  razorpay_order_id: z.string().min(1, "Razorpay order ID is required"),
+  razorpay_payment_id: z.string().min(1, "Razorpay payment ID is required"),
+  razorpay_signature: z.string().min(1, "Razorpay signature is required"),
 });
 
 // Query parameters schema

@@ -8,8 +8,9 @@ import {
   getBikeById,
   holdMultipleVehicles,
   releaseMultipleVehicles,
+  bookMultipleVehicles,
 } from "../bike/bike.service.ts";
-import { savePayment } from "../payment/payment.service.ts";
+import { savePayment, updatePayment } from "../payment/payment.service.ts";
 import { generateNumericEpochId } from "../../utils/generator.ts";
 import { getCollection } from "../db/database.ts";
 import {
@@ -82,15 +83,15 @@ async function calculatePricingBreakdown(
     const weekendAmount = totalWeekendCount * basePrice * weekendMultiplier;
     const vehicleSubtotal = weekdayAmount + weekendAmount;
 
-    items.push({
-      bikeId: vehicle.bikeId,
-      vehicleNumber: vehicle.vehicleNumber,
-      baseAmount: weekdayAmount,
-      weekendAmount: weekendAmount,
-      subtotal: vehicleSubtotal,
-      weekdayCount: totalWeekdayCount,
-      weekendCount: totalWeekendCount,
-    });
+    // items.push({
+    //   bikeId: vehicle.bikeId,
+    //   vehicleNumber: vehicle.vehicleNumber,
+    //   baseAmount: weekdayAmount,
+    //   weekendAmount: weekendAmount,
+    //   subtotal: vehicleSubtotal,
+    //   weekdayCount: totalWeekdayCount,
+    //   weekendCount: totalWeekendCount,
+    // });
 
     totalBaseAmount += weekdayAmount;
     totalWeekendAmount += weekendAmount;
@@ -102,7 +103,6 @@ async function calculatePricingBreakdown(
   const totalAmount = subtotalAmount + taxAmount;
 
   return {
-    items,
     totalBaseAmount,
     totalWeekendAmount,
     subtotalAmount,
@@ -167,6 +167,8 @@ export async function createBookingOrderService(
   // Create booking vehicles with denormalized data
   const bookingVehicles = await createBookingVehicles(validatedData.vehicles);
 
+  console.log("Booking Vehicles:", bookingVehicles);
+
   // Calculate pricing breakdown
   const pricingBreakdown = await calculatePricingBreakdown(
     validatedData.vehicles,
@@ -177,7 +179,8 @@ export async function createBookingOrderService(
   try {
     const result = await holdMultipleVehicles(
       validatedData.vehicles,
-      BOOK_HOLD_DURATION
+      BOOK_HOLD_DURATION,
+      validatedData.userId
     );
 
     if (!result.success) {
@@ -187,7 +190,11 @@ export async function createBookingOrderService(
       throw new Error(`Failed to hold vehicles: ${failedDetails}`);
     }
   } catch (error) {
-    releaseMultipleVehicles(validatedData.vehicles, BOOK_HOLD_DURATION);
+    releaseMultipleVehicles(
+      validatedData.vehicles,
+      BOOK_HOLD_DURATION,
+      validatedData.userId
+    );
     if (error instanceof Error) {
       throw new Error(`Failed to hold vehicles: ${error.message}`);
     } else {
@@ -218,11 +225,11 @@ export async function createBookingOrderService(
     toDate: validatedData.toDate,
     totalDays,
     pricing: pricingBreakdown,
-    payment: {
-      orderId: order.id,
-      paymentStatus: "PENDING",
-      razorpayOrderId: order.id,
-    },
+    // payment: {
+    //   orderId: order.id,
+    //   paymentStatus: "PENDING",
+    //   razorpayOrderId: order.id,
+    // },
     bookingStatus: "INITIATED",
     features: validatedData.features,
     metadata: {
@@ -239,6 +246,20 @@ export async function createBookingOrderService(
   const validatedBooking = BookingSchema.parse(bookingData);
   const bookingCollection = await getCollection("bookings");
   await bookingCollection.insertOne(validatedBooking);
+
+  if (validatedBooking) {
+    await savePayment({
+      bookingId: validatedBooking?.bookingId as string,
+      paymentId: generateNumericEpochId("PAY"),
+      userId: validatedBooking.userId,
+      amount: validatedBooking.pricing.totalAmount,
+      razorpay_order_id: order.id,
+      razorpay_payment_id: "",
+      status: "pending",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 
   return {
     orderId: order.id,
@@ -267,11 +288,18 @@ export async function completeBookingPaymentService(
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
 
+  console.log("Generated Signature:", generatedSignature);
+  console.log("Received Signature:", razorpay_signature);
+  console.log(generatedSignature === razorpay_signature);
+
   if (generatedSignature !== razorpay_signature) {
     // Release all held vehicles
-    for (const vehicle of booking.vehicles) {
-      await releaseBike(vehicle.bikeId, vehicle.vehicleNumber);
-    }
+
+    await releaseMultipleVehicles(
+      booking.vehicles,
+      BOOK_HOLD_DURATION,
+      booking.userId as Booking["userId"]
+    );
 
     // Update booking status
     await bookingCollection.updateOne(
@@ -287,73 +315,92 @@ export async function completeBookingPaymentService(
     );
 
     return { success: false, error: "Payment verification failed" };
-  }
-
-  try {
-    // Capture payment
-    await razorpay.payments.capture(
-      razorpay_payment_id,
-      Math.round(booking.pricing.totalAmount * 100),
-      "INR"
-    );
-
-    // Confirm booking for all vehicles
-    const bookPromises = booking.vehicles.map((vehicle) =>
-      bookBike(vehicle.bikeId, vehicle.vehicleNumber)
-    );
-    await Promise.all(bookPromises);
-
-    // Update booking status
-    const updatedBooking = await bookingCollection.findOneAndUpdate(
-      { bookingId },
-      {
-        $set: {
-          "payment.paymentStatus": "SUCCESS",
-          "payment.paymentId": razorpay_payment_id,
-          "payment.razorpayPaymentId": razorpay_payment_id,
-          "payment.transactionDate": new Date(),
-          bookingStatus: "CONFIRMED",
-          updatedAt: new Date(),
-        },
-      },
-      { returnDocument: "after" }
-    );
-
-    // Save payment record
-    await savePayment({
-      bookingId,
-      userId: booking.userId,
-      amount: booking.pricing.totalAmount,
-      razorpay_order_id,
-      razorpay_payment_id,
-      status: "captured",
-      createdAt: new Date(),
-    });
-
-    return { success: true, booking: updatedBooking.value as Booking };
-  } catch (error) {
-    if (error instanceof Error) {
-      const result = await releaseMultipleVehicles(
-        booking.vehicles,
-        BOOK_HOLD_DURATION
+  } else {
+    try {
+      // Capture payment
+      const result = await razorpay.payments.capture(
+        razorpay_payment_id,
+        Math.round(booking.pricing.totalAmount * 100),
+        "INR"
       );
-      await bookingCollection.updateOne(
+
+      console.log("Payment captured:", result);
+
+      // Release all held vehicles
+
+      // Confirm booking for all vehicles
+      // const bookPromises = booking.vehicles.map((vehicle) =>
+      //   bookBike(vehicle.bikeId, vehicle.vehicleNumber)
+      // );
+      // await Promise.all(bookPromises);
+
+      if (result) {
+        await bookMultipleVehicles(
+          booking.vehicles,
+          BOOK_HOLD_DURATION,
+          booking.userId as Booking["userId"]
+        );
+      }
+
+      // Update booking status
+      const updatedBooking = await bookingCollection.findOneAndUpdate(
         { bookingId },
         {
           $set: {
-            "payment.paymentStatus": "FAILED",
-            bookingStatus: "CANCELLED",
+            "payment.paymentStatus": "SUCCESS",
+            "payment.paymentId": razorpay_payment_id,
+            "payment.razorpayPaymentId": razorpay_payment_id,
+            "payment.transactionDate": new Date(),
+            bookingStatus: "CONFIRMED",
             updatedAt: new Date(),
           },
-        }
+        },
+        { returnDocument: "after" }
       );
 
-      return {
-        success: false,
-        error: `Payment capture failed: ${error.message}`,
-      };
-    } else {
-      return { success: false, error: "Payment capture failed" };
+      await updatePayment(bookingId, "captured", razorpay_payment_id);
+
+      // Save payment record
+      // await savePayment({
+      //   bookingId,
+      //   paymentId: generateNumericEpochId("PAY"),
+      //   userId: booking.userId,
+      //   amount: booking.pricing.totalAmount,
+      //   razorpay_order_id,
+      //   razorpay_payment_id,
+      //   status: "captured",
+      //   createdAt: new Date(),
+      //   updatedAt: new Date(),
+      // });
+
+      return { success: true, booking: updatedBooking as Booking };
+    } catch (error) {
+      console.log("error", error);
+      if (error instanceof Error) {
+        const result = await releaseMultipleVehicles(
+          booking.vehicles,
+          BOOK_HOLD_DURATION,
+          booking.userId as Booking["userId"]
+        );
+        await bookingCollection.updateOne(
+          { bookingId },
+          {
+            $set: {
+              "payment.paymentStatus": "FAILED",
+              bookingStatus: "CANCELLED",
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        return {
+          success: false,
+          error: `Payment capture failed: ${error.message}`,
+        };
+      } else {
+        console.log("error", error);
+        return { success: false, error: "Payment capture failed" };
+      }
     }
   }
 }
@@ -416,6 +463,11 @@ export async function cancelBookingService(
     throw new Error("Booking not found");
   }
 
+  const paymentCol = await getCollection("payments");
+  const payment = await paymentCol.findOne({
+    bookingId: validatedData.bookingId,
+  });
+
   // Check if booking can be cancelled
   if (["COMPLETED", "CANCELLED"].includes(booking.bookingStatus)) {
     throw new Error(
@@ -431,10 +483,7 @@ export async function cancelBookingService(
 
   // Process refund if payment was successful
   let refundAmount = 0;
-  if (
-    booking.payment.paymentStatus === "SUCCESS" &&
-    validatedData.refundAmount
-  ) {
+  if (payment.paymentStatus === "SUCCESS" && validatedData.refundAmount) {
     refundAmount = validatedData.refundAmount;
     // You can implement actual refund logic here with Razorpay
   }
@@ -445,8 +494,6 @@ export async function cancelBookingService(
     {
       $set: {
         bookingStatus: "CANCELLED",
-        "payment.paymentStatus":
-          refundAmount > 0 ? "REFUNDED" : booking.payment.paymentStatus,
         "metadata.cancellationReason": validatedData.cancellationReason,
         "metadata.refundAmount": refundAmount,
         updatedAt: new Date(),
