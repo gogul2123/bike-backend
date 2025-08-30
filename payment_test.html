@@ -27,7 +27,7 @@
         border-radius: 20px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         overflow: hidden;
-        max-width: 500px;
+        max-width: 600px;
         width: 100%;
       }
 
@@ -64,7 +64,9 @@
 
       input[type="text"],
       input[type="number"],
-      select {
+      input[type="datetime-local"],
+      select,
+      textarea {
         width: 100%;
         padding: 15px;
         border: 2px solid #e1e5e9;
@@ -75,10 +77,24 @@
 
       input[type="text"]:focus,
       input[type="number"]:focus,
-      select:focus {
+      input[type="datetime-local"]:focus,
+      select:focus,
+      textarea:focus {
         outline: none;
         border-color: #4caf50;
         box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .checkbox-group input[type="checkbox"] {
+        width: auto;
+        margin: 0;
       }
 
       .bike-info {
@@ -211,6 +227,36 @@
           transform: rotate(360deg);
         }
       }
+
+      .vehicle-selection {
+        border: 2px solid #e1e5e9;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        cursor: pointer;
+        transition: border-color 0.3s ease;
+      }
+
+      .vehicle-selection:hover {
+        border-color: #4caf50;
+      }
+
+      .vehicle-selection.selected {
+        border-color: #4caf50;
+        background: #f0f8f0;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+      }
+
+      @media (max-width: 768px) {
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
@@ -218,37 +264,13 @@
       <!-- Booking Form -->
       <div id="bookingForm">
         <div class="header">
-          <h1>🏍️ Book Your Bike</h1>
+          <h1>🏍️ Book Your Royal Enfield</h1>
           <p>Complete your booking with secure payment</p>
         </div>
 
         <div class="form-section">
           <form id="bikeBookingForm">
-            <div class="form-group">
-              <label for="bikeId">Select Bike:</label>
-              <select id="bikeId" required>
-                <option value="">Choose a bike</option>
-                <option value="BIKE1756029137543000">
-                  Honda Activa 6G - ₹500/day
-                </option>
-                <option value="bike002">TVS Jupiter - ₹450/day</option>
-                <option value="bike003">Hero Splendor Plus - ₹400/day</option>
-                <option value="bike004">Yamaha FZS - ₹800/day</option>
-                <option value="bike005">Bajaj Pulsar 150 - ₹750/day</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="vehicleNumber">Vehicle Number:</label>
-              <input
-                type="text"
-                id="vehicleNumber"
-                placeholder="e.g., TN01AB1234"
-                value="KA01AB1234"
-                required
-              />
-            </div>
-
+            <!-- User ID -->
             <div class="form-group">
               <label for="userId">User ID:</label>
               <input
@@ -259,35 +281,175 @@
               />
             </div>
 
+            <!-- Vehicle Selection -->
             <div class="form-group">
-              <label for="days">Number of Days:</label>
-              <input
-                type="number"
-                id="days"
-                min="1"
-                max="30"
-                value="1"
-                required
-              />
+              <label>Select Vehicle:</label>
+              <div
+                class="vehicle-selection"
+                data-vehicle-id="VEH1756307559619000"
+                data-bike-id="BIKE1756400843175000"
+                data-vehicle-number="KA01AB1234"
+                data-location="Bangalore Main Branch"
+                data-condition="EXCELLENT"
+              >
+                <input
+                  type="radio"
+                  name="vehicle"
+                  value="VEH1756307559619000"
+                  id="vehicle1"
+                  style="margin-right: 10px"
+                />
+                <label for="vehicle1" style="display: inline; margin: 0">
+                  <strong>KA01AB1234</strong> - Royal Enfield Himalayan 411<br />
+                  <small
+                    >Bangalore Main Branch • Excellent Condition •
+                    ₹2500/day</small
+                  >
+                </label>
+              </div>
+              <div
+                class="vehicle-selection"
+                data-vehicle-id="VEH1756307559619001"
+                data-bike-id="BIKE1756400843175000"
+                data-vehicle-number="KA02CD5678"
+                data-location="Bangalore HSR Branch"
+                data-condition="GOOD"
+              >
+                <input
+                  type="radio"
+                  name="vehicle"
+                  value="VEH1756307559619001"
+                  id="vehicle2"
+                  style="margin-right: 10px"
+                />
+                <label for="vehicle2" style="display: inline; margin: 0">
+                  <strong>KA02CD5678</strong> - Royal Enfield Himalayan 411<br />
+                  <small
+                    >Bangalore HSR Branch • Good Condition • ₹2500/day</small
+                  >
+                </label>
+              </div>
+            </div>
+
+            <!-- Date Selection -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="fromDate">From Date:</label>
+                <input type="datetime-local" id="fromDate" required />
+              </div>
+              <div class="form-group">
+                <label for="toDate">To Date:</label>
+                <input type="datetime-local" id="toDate" required />
+              </div>
+            </div>
+
+            <!-- Additional Features -->
+            <div class="form-group">
+              <label>Additional Features:</label>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="pickupLocation">Pickup Location:</label>
+                  <input
+                    type="text"
+                    id="pickupLocation"
+                    placeholder="Enter pickup location"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="dropLocation">Drop Location:</label>
+                  <input
+                    type="text"
+                    id="dropLocation"
+                    placeholder="Enter drop location"
+                  />
+                </div>
+              </div>
+
+              <div class="checkbox-group">
+                <input type="checkbox" id="insuranceIncluded" />
+                <label for="insuranceIncluded"
+                  >Include Insurance (+₹200/day)</label
+                >
+              </div>
+
+              <div class="checkbox-group">
+                <input type="checkbox" id="deliveryRequired" />
+                <label for="deliveryRequired"
+                  >Home Delivery Required (+₹500)</label
+                >
+              </div>
+
+              <div
+                class="form-group"
+                id="deliveryAddressGroup"
+                style="display: none"
+              >
+                <label for="deliveryAddress">Delivery Address:</label>
+                <textarea
+                  id="deliveryAddress"
+                  rows="3"
+                  placeholder="Enter delivery address"
+                ></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="emergencyContact">Emergency Contact:</label>
+                <input
+                  type="text"
+                  id="emergencyContact"
+                  placeholder="Enter emergency contact number"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="specialRequests">Special Requests:</label>
+                <textarea
+                  id="specialRequests"
+                  rows="3"
+                  placeholder="Any special requirements or notes"
+                ></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="customerNotes">Customer Notes:</label>
+                <textarea
+                  id="customerNotes"
+                  rows="3"
+                  placeholder="Additional notes for your booking"
+                ></textarea>
+              </div>
             </div>
 
             <div class="bike-info" id="bikeInfo" style="display: none">
               <h3>Booking Summary</h3>
               <div class="info-row">
                 <span>Bike Model:</span>
-                <span id="selectedBikeName"></span>
+                <span id="selectedBikeName">Royal Enfield Himalayan 411</span>
               </div>
               <div class="info-row">
                 <span>Vehicle Number:</span>
                 <span id="displayVehicleNumber"></span>
               </div>
               <div class="info-row">
+                <span>Location:</span>
+                <span id="displayLocation"></span>
+              </div>
+              <div class="info-row">
                 <span>Daily Rate:</span>
-                <span id="dailyRate"></span>
+                <span id="dailyRate">₹2500</span>
               </div>
               <div class="info-row">
                 <span>Duration:</span>
-                <span id="displayDays"></span>
+                <span id="displayDuration"></span>
+              </div>
+              <div class="info-row">
+                <span>Insurance:</span>
+                <span id="displayInsurance">Not included</span>
+              </div>
+              <div class="info-row">
+                <span>Delivery:</span>
+                <span id="displayDelivery">Not required</span>
               </div>
             </div>
 
@@ -321,8 +483,12 @@
         <div class="transaction-details">
           <h3>Booking Details</h3>
           <div class="info-row">
-            <span>Transaction ID:</span>
-            <span id="successTransactionId">-</span>
+            <span>Booking ID:</span>
+            <span id="successBookingId">-</span>
+          </div>
+          <div class="info-row">
+            <span>Payment ID:</span>
+            <span id="successPaymentId">-</span>
           </div>
           <div class="info-row">
             <span>Bike Model:</span>
@@ -378,81 +544,179 @@
       const API_BASE_URL = "http://localhost:8000/api"; // Change this to your API URL
       const RAZORPAY_KEY = "rzp_test_RZ4yu67jLQUpuF"; // Your Razorpay test key
 
-      // Bike pricing data
+      // Vehicle and pricing data
       const bikeData = {
-        BIKE1756029137543000: { name: "Honda Activa 6G", price: 500 },
-        bike002: { name: "TVS Jupiter", price: 450 },
-        bike003: { name: "Hero Splendor Plus", price: 400 },
-        bike004: { name: "Yamaha FZS", price: 800 },
-        bike005: { name: "Bajaj Pulsar 150", price: 750 },
+        basePrice: 2500,
+        weekendMultiplier: 1.8,
+        insurancePerDay: 200,
+        deliveryCharge: 500,
       };
 
       // DOM elements
-      const bikeSelect = document.getElementById("bikeId");
-      const vehicleNumberInput = document.getElementById("vehicleNumber");
-      const userIdInput = document.getElementById("userId");
-      const daysInput = document.getElementById("days");
-      const bikeInfo = document.getElementById("bikeInfo");
-      const totalAmountSpan = document.getElementById("totalAmount");
       const form = document.getElementById("bikeBookingForm");
+      const vehicleSelections = document.querySelectorAll(
+        'input[name="vehicle"]'
+      );
+      const fromDateInput = document.getElementById("fromDate");
+      const toDateInput = document.getElementById("toDate");
+      const deliveryRequiredCheckbox =
+        document.getElementById("deliveryRequired");
+      const deliveryAddressGroup = document.getElementById(
+        "deliveryAddressGroup"
+      );
+      const insuranceCheckbox = document.getElementById("insuranceIncluded");
+
+      // Set default dates
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      fromDateInput.value = now.toISOString().slice(0, 16);
+      toDateInput.value = tomorrow.toISOString().slice(0, 16);
+
+      // Event listeners
+      vehicleSelections.forEach((radio) => {
+        radio.addEventListener("change", function () {
+          // Update vehicle selection styling
+          document.querySelectorAll(".vehicle-selection").forEach((div) => {
+            div.classList.remove("selected");
+          });
+          this.closest(".vehicle-selection").classList.add("selected");
+          updateBookingSummary();
+        });
+      });
+
+      fromDateInput.addEventListener("change", updateBookingSummary);
+      toDateInput.addEventListener("change", updateBookingSummary);
+      insuranceCheckbox.addEventListener("change", updateBookingSummary);
+      deliveryRequiredCheckbox.addEventListener("change", function () {
+        deliveryAddressGroup.style.display = this.checked ? "block" : "none";
+        updateBookingSummary();
+      });
 
       // Update booking summary
       function updateBookingSummary() {
-        const selectedBikeId = bikeSelect.value;
-        const vehicleNumber = vehicleNumberInput.value;
-        const days = parseInt(daysInput.value) || 1;
-
-        if (selectedBikeId && bikeData[selectedBikeId]) {
-          const bike = bikeData[selectedBikeId];
-          const totalAmount = bike.price * days;
-
-          document.getElementById("selectedBikeName").textContent = bike.name;
-          document.getElementById("displayVehicleNumber").textContent =
-            vehicleNumber || "Not entered";
-          document.getElementById("dailyRate").textContent = `₹${bike.price}`;
-          document.getElementById("displayDays").textContent = `${days} day(s)`;
-          totalAmountSpan.textContent = totalAmount;
-
-          bikeInfo.style.display = "block";
-        } else {
-          bikeInfo.style.display = "none";
-          totalAmountSpan.textContent = "0";
+        const selectedVehicle = document.querySelector(
+          'input[name="vehicle"]:checked'
+        );
+        if (!selectedVehicle) {
+          document.getElementById("bikeInfo").style.display = "none";
+          document.getElementById("totalAmount").textContent = "0";
+          return;
         }
-      }
 
-      // Event listeners
-      bikeSelect.addEventListener("change", updateBookingSummary);
-      vehicleNumberInput.addEventListener("input", updateBookingSummary);
-      daysInput.addEventListener("input", updateBookingSummary);
+        const vehicleDiv = selectedVehicle.closest(".vehicle-selection");
+        const vehicleNumber = vehicleDiv.dataset.vehicleNumber;
+        const location = vehicleDiv.dataset.location;
+
+        const fromDate = new Date(fromDateInput.value);
+        const toDate = new Date(toDateInput.value);
+
+        if (fromDate >= toDate) {
+          document.getElementById("bikeInfo").style.display = "none";
+          document.getElementById("totalAmount").textContent = "0";
+          return;
+        }
+
+        const timeDiff = toDate.getTime() - fromDate.getTime();
+        const days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+        // Calculate pricing
+        let dailyRate = bikeData.basePrice;
+
+        // Check if it includes weekend days (simplified - just check if more than 2 days includes weekend)
+        const isWeekend =
+          days > 2 ||
+          fromDate.getDay() === 0 ||
+          fromDate.getDay() === 6 ||
+          toDate.getDay() === 0 ||
+          toDate.getDay() === 6;
+        if (isWeekend) {
+          dailyRate = Math.round(
+            bikeData.basePrice * bikeData.weekendMultiplier
+          );
+        }
+
+        let totalAmount = dailyRate * days;
+
+        if (insuranceCheckbox.checked) {
+          totalAmount += bikeData.insurancePerDay * days;
+        }
+
+        if (deliveryRequiredCheckbox.checked) {
+          totalAmount += bikeData.deliveryCharge;
+        }
+
+        // Update display
+        document.getElementById("displayVehicleNumber").textContent =
+          vehicleNumber;
+        document.getElementById("displayLocation").textContent = location;
+        document.getElementById("dailyRate").textContent = `₹${dailyRate}`;
+        document.getElementById(
+          "displayDuration"
+        ).textContent = `${days} day(s)`;
+        document.getElementById("displayInsurance").textContent =
+          insuranceCheckbox.checked
+            ? `₹${bikeData.insurancePerDay}/day`
+            : "Not included";
+        document.getElementById("displayDelivery").textContent =
+          deliveryRequiredCheckbox.checked
+            ? `₹${bikeData.deliveryCharge}`
+            : "Not required";
+        document.getElementById("totalAmount").textContent = totalAmount;
+
+        document.getElementById("bikeInfo").style.display = "block";
+      }
 
       // Form submission
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        const formData = {
-          bikeId: bikeSelect.value,
-          vehicleNumber: vehicleNumberInput.value,
-          userId: userIdInput.value,
-          amount: parseInt(totalAmountSpan.textContent),
-        };
-
-        if (
-          !formData.bikeId ||
-          !formData.vehicleNumber ||
-          !formData.userId ||
-          !formData.amount
-        ) {
-          console.log(
-            formData.bikeId,
-            formData.vehicleNumber,
-            formData.userId,
-            formData.amount
-          );
-          alert("Please fill all required fields");
+        const selectedVehicle = document.querySelector(
+          'input[name="vehicle"]:checked'
+        );
+        if (!selectedVehicle) {
+          alert("Please select a vehicle");
           return;
         }
 
-        await processPayment(formData);
+        const vehicleDiv = selectedVehicle.closest(".vehicle-selection");
+        const fromDate = new Date(fromDateInput.value);
+        const toDate = new Date(toDateInput.value);
+
+        if (fromDate >= toDate) {
+          alert("To date must be after from date");
+          return;
+        }
+
+        const bookingData = {
+          userId: document.getElementById("userId").value,
+          vehicles: [
+            {
+              bikeId: vehicleDiv.dataset.bikeId,
+              vehicleNumber: vehicleDiv.dataset.vehicleNumber,
+            },
+          ],
+          fromDate: fromDate.toISOString(),
+          toDate: toDate.toISOString(),
+          features: {
+            pickupLocation:
+              document.getElementById("pickupLocation").value || undefined,
+            dropLocation:
+              document.getElementById("dropLocation").value || undefined,
+            specialRequests:
+              document.getElementById("specialRequests").value || undefined,
+            insuranceIncluded: insuranceCheckbox.checked,
+            deliveryRequired: deliveryRequiredCheckbox.checked,
+            deliveryAddress: deliveryRequiredCheckbox.checked
+              ? document.getElementById("deliveryAddress").value
+              : undefined,
+            emergencyContact:
+              document.getElementById("emergencyContact").value || undefined,
+          },
+          customerNotes:
+            document.getElementById("customerNotes").value || undefined,
+        };
+
+        await processPayment(bookingData);
       });
 
       // Process payment
@@ -473,23 +737,23 @@
           );
 
           if (!orderResponse.ok) {
-            throw new Error("Failed to create order");
+            const errorData = await orderResponse.json();
+            throw new Error(errorData.message || "Failed to create order");
           }
 
           const orderData = await orderResponse.json();
-
           hideLoading();
 
           // Initialize Razorpay
           const options = {
             key: orderData.data.razorpayKey || RAZORPAY_KEY,
-            amount: bookingData.amount * 100, // Amount in paise
+            amount: orderData.data.booking.pricing.totalAmount * 100, // Amount in paise
             currency: "INR",
             name: "Bike Booking Service",
-            description: `Booking for ${bikeData[bookingData.bikeId].name}`,
+            description: `Booking for Royal Enfield Himalayan 411`,
             order_id: orderData.data.orderId,
             handler: function (response) {
-              verifyPayment(response, bookingData);
+              verifyPayment(response, orderData.data.booking.bookingId);
             },
             prefill: {
               name: "Test User",
@@ -516,19 +780,19 @@
       }
 
       // Verify payment
-      async function verifyPayment(response, bookingData) {
+      async function verifyPayment(response, bookingId) {
         try {
           showLoading();
-
+          console.log("Payment verification response:", response);
           const verificationData = {
-            ...bookingData,
+            bookingId: bookingId,
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
           };
 
           const verifyResponse = await fetch(
-            `${API_BASE_URL}/booking/verify-payment`,
+            `${API_BASE_URL}/booking/confirmBooking`,
             {
               method: "POST",
               headers: {
@@ -541,9 +805,11 @@
           hideLoading();
 
           if (verifyResponse.ok) {
-            showSuccess(response.razorpay_payment_id, bookingData);
+            const result = await verifyResponse.json();
+            showSuccess(response.razorpay_payment_id, bookingId, result);
           } else {
-            showFailure("Payment verification failed");
+            const errorData = await verifyResponse.json();
+            showFailure(errorData.message || "Payment verification failed");
           }
         } catch (error) {
           console.error("Payment verification error:", error);
@@ -564,22 +830,30 @@
         document.getElementById("loadingState").style.display = "none";
       }
 
-      function showSuccess(transactionId, bookingData) {
+      function showSuccess(paymentId, bookingId, result) {
         document.getElementById("bookingForm").style.display = "none";
         document.getElementById("loadingState").style.display = "none";
         document.getElementById("successPage").style.display = "block";
         document.getElementById("failurePage").style.display = "none";
 
         // Update success page details
-        document.getElementById("successTransactionId").textContent =
-          transactionId;
+        document.getElementById("successBookingId").textContent = bookingId;
+        document.getElementById("successPaymentId").textContent = paymentId;
         document.getElementById("successBikeModel").textContent =
-          bikeData[bookingData.bikeId].name;
-        document.getElementById("successVehicleNumber").textContent =
-          bookingData.vehicleNumber;
-        document.getElementById(
-          "successAmount"
-        ).textContent = `₹${bookingData.amount}`;
+          "Royal Enfield Himalayan 411";
+
+        const selectedVehicle = document.querySelector(
+          'input[name="vehicle"]:checked'
+        );
+        if (selectedVehicle) {
+          const vehicleDiv = selectedVehicle.closest(".vehicle-selection");
+          document.getElementById("successVehicleNumber").textContent =
+            vehicleDiv.dataset.vehicleNumber;
+        }
+
+        document.getElementById("successAmount").textContent = `₹${
+          document.getElementById("totalAmount").textContent
+        }`;
       }
 
       function showFailure(errorMessage = "Payment processing failed") {
@@ -599,10 +873,20 @@
 
         // Reset form
         form.reset();
-        userIdInput.value = "user_12345";
-        daysInput.value = "1";
-        bikeInfo.style.display = "none";
-        totalAmountSpan.textContent = "0";
+        document.getElementById("userId").value = "USR1754833148052000";
+
+        // Reset dates
+        const now = new Date();
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        fromDateInput.value = now.toISOString().slice(0, 16);
+        toDateInput.value = tomorrow.toISOString().slice(0, 16);
+
+        document.getElementById("bikeInfo").style.display = "none";
+        document.getElementById("totalAmount").textContent = "0";
+        document.querySelectorAll(".vehicle-selection").forEach((div) => {
+          div.classList.remove("selected");
+        });
+        deliveryAddressGroup.style.display = "none";
       }
 
       // Initialize

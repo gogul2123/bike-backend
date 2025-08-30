@@ -18,6 +18,8 @@ export const createBookingOrder = async (req: Request, res: Response) => {
   try {
     const bookingData = req.body;
 
+    console.log("Received booking data:", bookingData);
+
     const result = await createBookingOrderService(bookingData);
 
     sendSuccess(res, result, "Booking order created successfully");
@@ -43,6 +45,8 @@ export const verifyPayment = async (req: Request, res: Response) => {
       razorpay_signature
     );
 
+    console.log("Payment verification result:", result);
+
     if (result.success && result.booking) {
       sendSuccess(
         res,
@@ -50,6 +54,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
         "Payment verified and booking confirmed"
       );
     } else {
+      console.log("Payment verification failed:", result);
       sendError(res, 400, result.error || "Payment verification failed");
     }
   } catch (err: any) {
@@ -186,6 +191,10 @@ export const activateBookings = async (req: Request, res: Response) => {
 export const completeBookings = async (req: Request, res: Response) => {
   try {
     const completedCount = await completeBookingsService();
+    if (!completedCount) {
+      sendError(res, 400, "No bookings to complete");
+      return;
+    }
 
     sendSuccess(res, { completedCount }, "Bookings completed successfully");
   } catch (err: any) {

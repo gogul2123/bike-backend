@@ -587,7 +587,8 @@ export async function holdBike(
 
 export async function holdMultipleVehicles(
   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
-  holdDurationMs: number
+  holdDurationMs: number,
+  userId?: string | null
 ): Promise<{
   success: boolean;
   failedVehicles: Array<{
@@ -626,6 +627,93 @@ export async function holdMultipleVehicles(
         },
         {
           $set: {
+            "vehicles.$[elem].status": "HOLDING",
+            "vehicles.$[elem].metadata.holdExpiryTime": holdExpiryTime,
+            "vehicles.$[elem].metadata.holdedBy": userId,
+            "vehicles.$[elem].metadata.lastUpdated": currentDate,
+            updatedAt: currentDate,
+          },
+        },
+        {
+          arrayFilters: [
+            {
+              "elem.vehicleNumber": { $in: vehicleNumbers },
+              "elem.status": "AVAILABLE",
+            },
+          ],
+        }
+      );
+
+      // Check if update was successful
+      if (result.modifiedCount === 0) {
+        vehicleNumbers.forEach((vehicleNumber) => {
+          failedVehicles.push({
+            bikeId,
+            vehicleNumber,
+            error: "Vehicle not available or update failed",
+          });
+        });
+      }
+    }
+  } catch (error) {
+    vehicles.forEach((vehicle) => {
+      failedVehicles.push({
+        bikeId: vehicle.bikeId,
+        vehicleNumber: vehicle.vehicleNumber,
+        error: "Database operation failed",
+      });
+    });
+  }
+
+  return {
+    success: failedVehicles.length === 0,
+    failedVehicles,
+  };
+}
+
+export async function bookMultipleVehicles(
+  vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
+  holdDurationMs: number,
+  userId?: string | null
+): Promise<{
+  success: boolean;
+  failedVehicles: Array<{
+    bikeId: string;
+    vehicleNumber: string;
+    error: string;
+  }>;
+}> {
+  const bikeCollection = await getCollection("bikes");
+  const holdExpiryTime = new Date(Date.now() + holdDurationMs);
+  const currentDate = new Date();
+
+  const failedVehicles: Array<{
+    bikeId: string;
+    vehicleNumber: string;
+    error: string;
+  }> = [];
+
+  try {
+    // Group by bikeId for more efficient updates
+    const vehiclesByBikeId = vehicles.reduce((acc, vehicle) => {
+      if (!acc[vehicle.bikeId]) {
+        acc[vehicle.bikeId] = [];
+      }
+      acc[vehicle.bikeId].push(vehicle.vehicleNumber);
+      return acc;
+    }, {} as Record<string, string[]>);
+
+    // Update each bike with multiple vehicles in one operation
+    for (const [bikeId, vehicleNumbers] of Object.entries(vehiclesByBikeId)) {
+      const result = await bikeCollection.updateOne(
+        {
+          bikeId,
+          "vehicles.vehicleNumber": { $in: vehicleNumbers },
+          "vehicles.status": "HOLDING",
+          "vehicles.metadata.holdedBy": userId,
+        },
+        {
+          $set: {
             "vehicles.$[elem].status": "RENTED",
             "vehicles.$[elem].metadata.holdExpiryTime": holdExpiryTime,
             "vehicles.$[elem].metadata.lastUpdated": currentDate,
@@ -636,7 +724,8 @@ export async function holdMultipleVehicles(
           arrayFilters: [
             {
               "elem.vehicleNumber": { $in: vehicleNumbers },
-              "elem.status": "AVAILABLE",
+              "elem.status": "HOLDING",
+              "elem.metadata.holdedBy": userId,
             },
           ],
         }
@@ -765,7 +854,8 @@ export async function releaseBike(
 
 export async function releaseMultipleVehicles(
   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
-  holdDurationMs: number
+  holdDurationMs: number,
+  userId?: string | null
 ): Promise<{
   success: boolean;
   failedVehicles: Array<{
@@ -800,7 +890,8 @@ export async function releaseMultipleVehicles(
         {
           bikeId,
           "vehicles.vehicleNumber": { $in: vehicleNumbers },
-          "vehicles.status": "RENTED",
+          "vehicles.status": "HOLDING",
+          "vehicles.metadata.holdedBy": userId,
         },
         {
           $set: {
@@ -810,13 +901,15 @@ export async function releaseMultipleVehicles(
           },
           $unset: {
             "vehicles.$[elem].metadata.holdExpiryTime": "",
+            "vehicles.$[elem].metadata.holdedBy": "",
           },
         },
         {
           arrayFilters: [
             {
               "elem.vehicleNumber": { $in: vehicleNumbers },
-              "elem.status": "RENTED",
+              "elem.status": "HOLDING",
+              "elem.metadata.holdedBy": userId,
             },
           ],
         }

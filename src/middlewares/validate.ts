@@ -10,6 +10,8 @@ export const validateZod = (schema: ZodObject<any>): RequestHandler => {
       params: req.params,
     };
 
+    console.log("sources:", sources.body.vehicles);
+
     // Try validation against each source (body, query, params) using the same schema
     // Only one must succeed (whichever contains the matching fields)
     let parsedData = null;
