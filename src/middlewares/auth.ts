@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../utils/jwt.ts";
 import { JWTPayload } from "../types/index.ts";
-
 export function authenticateToken(
   req: Request,
   res: Response,
