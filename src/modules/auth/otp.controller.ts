@@ -88,7 +88,7 @@ export async function loginHandler(req: Request, res: Response) {
 
 export async function signUpHandler(req: Request, res: Response) {
   try {
-    const { email, fullName, mobile, password } = req.body;
+    const { email, name, mobile, password } = req.body;
     // const otp = await sendOtp();
     const hashedPassword = await bcrypt.hash(password, 10);
     const col = await getCollection("users");
@@ -107,7 +107,7 @@ export async function signUpHandler(req: Request, res: Response) {
       role: "user",
       status: "inactive" as const,
       email,
-      fullName,
+      name,
       mobile,
       password: hashedPassword,
     };
@@ -116,6 +116,24 @@ export async function signUpHandler(req: Request, res: Response) {
     return;
   } catch (error) {
     console.error("Error signing up:", error);
+    sendError(res, 500, "Internal server error");
+  }
+}
+
+export async function resetPasswordHandler(req: Request, res: Response) {
+  try {
+    const { email, newPassword } = req.body;
+    const col = await getCollection("users");
+    const user = await col.findOne({ email });
+    if (!user) {
+      sendError(res, 404, "User not found");
+      return;
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await col.updateOne({ email }, { $set: { password: hashedPassword } });
+    sendSuccess(res, {}, "Password reset successfully");
+  } catch (error) {
+    console.error("Error resetting password:", error);
     sendError(res, 500, "Internal server error");
   }
 }
