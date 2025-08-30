@@ -798,3 +798,251 @@ export async function completeBookingsService(): Promise<number> {
 
   return completedCount;
 }
+
+// utils/lateDeliveryUtils.ts
+
+/**
+ * Utility function to determine hourly rate based on bike base price
+ */
+export function getHourlyRateByBasePrice(basePrice: number): number {
+  if (basePrice < 1000) {
+    return 80;
+  } else if (basePrice >= 1000 && basePrice <= 1500) {
+    return 100;
+  } else {
+    return 120; // Above 1500
+  }
+}
+
+/**
+ * Calculate hours between two dates
+ */
+export function calculateHoursDifference(fromDate: Date, toDate: Date): number {
+  const diffTime = toDate.getTime() - fromDate.getTime();
+  const diffHours = diffTime / (1000 * 60 * 60);
+  return Math.max(0, Math.ceil(diffHours)); // Round up and ensure non-negative
+}
+
+/**
+ * Calculate late delivery charge for a single vehicle
+ */
+export function calculateVehicleLateCharge(
+  basePrice: number,
+  lateHours: number
+): { hourlyRate: number; lateHours: number; lateChargeAmount: number } {
+  const hourlyRate = getHourlyRateByBasePrice(basePrice);
+  const lateChargeAmount = lateHours * hourlyRate;
+
+  return {
+    hourlyRate,
+    lateHours,
+    lateChargeAmount,
+  };
+}
+
+// services/lateDeliveryService.ts
+
+interface VehicleLateCharge {
+  bikeId: string;
+  vehicleNumber: string;
+  modelName: string;
+  brand: string;
+  basePrice: number;
+  hourlyRate: number;
+  lateHours: number;
+  lateChargeAmount: number;
+}
+
+interface LateDeliveryBreakdown {
+  bookingId: string;
+  fromDate: Date;
+  currentDate: Date;
+  totalLateHours: number;
+  vehicles: VehicleLateCharge[];
+  totalLateChargeAmount: number;
+  currency: string;
+}
+
+export async function calculateLateDeliveryCharges(
+  bookingId: string,
+  currentDate: Date
+): Promise<LateDeliveryBreakdown | null | boolean> {
+  const col = await getCollection("bookings");
+
+  // MongoDB aggregation pipeline for optimized calculation and status update
+  const pipeline = [
+    // Match the specific booking
+    {
+      $match: {
+        bookingId: bookingId,
+      },
+    },
+
+    // Add calculated fields
+    {
+      $addFields: {
+        // Calculate total late hours
+        lateHours: {
+          $ceil: {
+            $divide: [
+              {
+                $subtract: [currentDate, "$fromDate"],
+              },
+              3600000, // Convert milliseconds to hours (1000 * 60 * 60)
+            ],
+          },
+        },
+        // Check if booking is actually late
+        isLate: {
+          $gt: [
+            {
+              $subtract: [currentDate, "$fromDate"],
+            },
+            0,
+          ],
+        },
+      },
+    },
+
+    // Unwind vehicles array to process each vehicle
+    {
+      $unwind: "$vehicles",
+    },
+
+    // Add hourly rate calculation for each vehicle (only if late)
+    {
+      $addFields: {
+        "vehicles.hourlyRate": {
+          $cond: {
+            if: "$isLate",
+            then: {
+              $switch: {
+                branches: [
+                  {
+                    case: { $lt: ["$vehicles.basePrice", 1000] },
+                    then: 80,
+                  },
+                  {
+                    case: {
+                      $and: [
+                        { $gte: ["$vehicles.basePrice", 1000] },
+                        { $lte: ["$vehicles.basePrice", 1500] },
+                      ],
+                    },
+                    then: 100,
+                  },
+                ],
+                default: 120, // Above 1500
+              },
+            },
+            else: 0,
+          },
+        },
+        "vehicles.lateChargeAmount": {
+          $cond: {
+            if: "$isLate",
+            then: {
+              $multiply: [
+                "$lateHours",
+                {
+                  $switch: {
+                    branches: [
+                      {
+                        case: { $lt: ["$vehicles.basePrice", 1000] },
+                        then: 80,
+                      },
+                      {
+                        case: {
+                          $and: [
+                            { $gte: ["$vehicles.basePrice", 1000] },
+                            { $lte: ["$vehicles.basePrice", 1500] },
+                          ],
+                        },
+                        then: 100,
+                      },
+                    ],
+                    default: 120,
+                  },
+                },
+              ],
+            },
+            else: 0,
+          },
+        },
+      },
+    },
+
+    // Group back to get all vehicles with their calculations
+    {
+      $group: {
+        _id: "$_id",
+        bookingId: { $first: "$bookingId" },
+        fromDate: { $first: "$fromDate" },
+        totalLateHours: { $first: "$lateHours" },
+        isLate: { $first: "$isLate" },
+        vehicles: {
+          $push: {
+            bikeId: "$vehicles.bikeId",
+            vehicleNumber: "$vehicles.vehicleNumber",
+            modelName: "$vehicles.modelName",
+            brand: "$vehicles.brand",
+            basePrice: "$vehicles.basePrice",
+            hourlyRate: "$vehicles.hourlyRate",
+            lateHours: "$lateHours",
+            lateChargeAmount: "$vehicles.lateChargeAmount",
+          },
+        },
+        totalLateChargeAmount: { $sum: "$vehicles.lateChargeAmount" },
+      },
+    },
+
+    // Project final structure
+    {
+      $project: {
+        _id: 0,
+        bookingId: 1,
+        fromDate: 1,
+        totalLateHours: 1,
+        isLate: 1,
+        vehicles: 1,
+        totalLateChargeAmount: 1,
+        currency: "INR",
+      },
+    },
+  ];
+
+  const result = await col.aggregate(pipeline).toArray();
+
+  if (result.length === 0) {
+    return null; // Booking not found
+  }
+
+  const breakdown = result[0];
+
+  // Update booking status to COMPLETED
+  const updatedResult = await col.updateOne(
+    { bookingId: bookingId },
+    {
+      $set: {
+        bookingStatus: "COMPLETED",
+        completedAt: currentDate,
+      },
+    }
+  );
+
+  if (updatedResult.modifiedCount === 0) {
+    return null;
+  }
+  if (breakdown.isLate && breakdown.totalLateHours > 0) {
+    return {
+      bookingId: breakdown.bookingId,
+      fromDate: breakdown.fromDate,
+      currentDate,
+      totalLateHours: Math.max(0, breakdown.totalLateHours),
+      vehicles: breakdown.vehicles,
+      totalLateChargeAmount: breakdown.totalLateChargeAmount,
+      currency: breakdown.currency,
+    };
+  }
+  return true;
+}

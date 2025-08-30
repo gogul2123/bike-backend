@@ -11,6 +11,7 @@ import {
   cleanupExpiredHoldsService,
   activateBookingsService,
   completeBookingsService,
+  calculateLateDeliveryCharges,
 } from "./booking.service.ts";
 import { sendError, sendSuccess } from "../../utils/response.ts";
 
@@ -213,5 +214,24 @@ export const healthCheck = async (req: Request, res: Response) => {
     );
   } catch (err: any) {
     sendError(res, 500, err.message);
+  }
+};
+
+export const completeBookingById = async (req: Request, res: Response) => {
+  try {
+    const { bookingId, currentDate } = req.body;
+    const result = await calculateLateDeliveryCharges(bookingId, currentDate);
+    if (result === null) {
+      sendError(res, 404, "Booking  not found");
+      return;
+    }
+    if (result === true) {
+      sendSuccess(res, "Booking  completed no late delivery charge available");
+      return;
+    }
+    sendSuccess(res, result, "Booking completed successfully");
+  } catch (err: any) {
+    sendError(res, 500, err.message);
+    return;
   }
 };

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { validateZod } from "../../middlewares/validate.ts";
+import { z } from "zod";
 import {
   createBookingOrder,
   verifyPayment,
@@ -13,6 +14,7 @@ import {
   activateBookings,
   completeBookings,
   healthCheck,
+  completeBookingById,
 } from "./booking.controller.ts";
 import {
   BookingById,
@@ -62,7 +64,14 @@ router.post("/cancelBooking", validateZod(CancelBookingInput), cancelBooking);
 // Admin routes
 router.post("/cleanup-holds", cleanupExpiredHolds);
 router.post("/activate-bookings", activateBookings);
-router.post("/complete-bookings", completeBookings);
+router.post("/completeAllbookings", completeBookings);
 router.get("/getAllBookings", validateZod(BookingQueryInput), getBookings);
+router.post(
+  "/completeBookingById",
+  validateZod(
+    BookingSchema.pick({ bookingId: true }).extend({ currentDate: z.date() })
+  ),
+  completeBookingById
+);
 
 export default router;
