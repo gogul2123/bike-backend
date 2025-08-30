@@ -1,49 +1,75 @@
 import { getCollection } from "../db/database.ts";
+import { Filter } from "mongodb";
 import {
   CreatePaymentInput,
   Payment,
   PaymentFilterInput,
-  paymentParamsSchemaZ,
 } from "./payment.model.ts";
 
 export async function createPayment(
   payment: CreatePaymentInput
-): Promise<string | null | boolean> {
+): Promise<string | null> {
   const col = await getCollection("payments");
-  const result = await col.insertOne(payment);
-  return result.insertedId.toString() || null;
+  const now = new Date().toISOString();
+
+  const paymentWithTimestamps = {
+    ...payment,
+    createdAt: { $date: now },
+    updatedAt: { $date: now },
+  };
+
+  const result = await col.insertOne(paymentWithTimestamps);
+  return result.insertedId.toString();
 }
 
-export async function getPaymentByTransaction(transactionId: string) {
+export async function getPaymentById(
+  paymentId: string
+): Promise<Payment | null> {
   const col = await getCollection("payments");
   return (await col.findOne(
-    { transactionId },
+    { paymentId },
     { projection: { _id: 0 } }
-  )) as CreatePaymentInput | null;
+  )) as Payment | null;
+}
+
+export async function getPaymentByBookingId(
+  bookingId: string
+): Promise<Payment | null> {
+  const col = await getCollection("payments");
+  return (await col.findOne(
+    { bookingId },
+    { projection: { _id: 0 } }
+  )) as Payment | null;
 }
 
 export async function getAllPayments(
-  filter: PaymentFilterInput,
-  page: number = 1,
-  limit: number = 10
-) {
+  filter: PaymentFilterInput
+): Promise<{ payments: Payment[]; total: number }> {
   const col = await getCollection("payments");
-  const match: any = {};
+  const match: Filter<Payment> = {};
+
+  // Build filter conditions
   if (filter.userId) match.userId = filter.userId;
-  if (filter.paymentStatus) match.paymentStatus = filter.paymentStatus;
-  if (filter.paymentMode) match.paymentMode = filter.paymentMode;
+  if (filter.status) match.status = filter.status;
+  if (filter.bookingId) match.bookingId = filter.bookingId;
+  if (filter.paymentId) match.paymentId = filter.paymentId;
+
+  // Date range filter
   if (filter.fromDate || filter.toDate) {
-    match.createdDate = {};
-    if (filter.fromDate) match.createdDate.$gte = filter.fromDate;
-    if (filter.toDate) match.createdDate.$lte = filter.toDate;
+    match.createdAt = {}; // Initialize createdAt as an empty object
+    if (filter.fromDate) match.createdAt.$gte = filter.fromDate;
+    if (filter.toDate) match.createdAt.$lte = filter.toDate;
   }
 
   const pipeline = [
     { $match: match },
-    { $sort: { createdDate: -1 } },
+    { $sort: { "createdAt.$date": -1 } },
     {
       $facet: {
-        items: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+        items: [
+          { $skip: ((filter.page as number) - 1) * (filter.limit as number) },
+          { $limit: filter.limit },
+        ],
         totalCount: [{ $count: "count" }],
       },
     },
@@ -56,9 +82,49 @@ export async function getAllPayments(
   ];
 
   const result = await col.aggregate(pipeline).toArray();
-  const { data = [], total = 0 } = result[0] || {};
-  return { data, total };
+  const { payments = [], total = 0 } = result[0] || {};
+  return { payments, total };
 }
+
+export const updatePaymentStatus = async (
+  paymentId: string,
+  updates: Partial<Pick<Payment, "status" | "razorpay_payment_id">>
+): Promise<boolean> => {
+  const col = await getCollection("payments");
+  const result = await col.updateOne(
+    { paymentId },
+    {
+      $set: {
+        ...updates,
+        updatedAt: { $date: new Date().toISOString() },
+      },
+    }
+  );
+  return result.modifiedCount > 0;
+};
+
+export const updatePaymentByBookingId = async (
+  bookingId: string,
+  updates: Partial<Pick<Payment, "status" | "razorpay_payment_id">>
+): Promise<boolean> => {
+  const col = await getCollection("payments");
+  const result = await col.updateOne(
+    { bookingId },
+    {
+      $set: {
+        ...updates,
+        updatedAt: { $date: new Date().toISOString() },
+      },
+    }
+  );
+  return result.modifiedCount > 0;
+};
+
+export const deletePayment = async (paymentId: string): Promise<boolean> => {
+  const col = await getCollection("payments");
+  const result = await col.deleteOne({ paymentId });
+  return result.deletedCount > 0;
+};
 
 export const savePayment = async (payment: Payment) => {
   const paymentsCol = await getCollection("payments");

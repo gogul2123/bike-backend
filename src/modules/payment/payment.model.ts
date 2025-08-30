@@ -1,40 +1,68 @@
 import { z } from "zod";
 
+const paymentStatus = ["PENDING", "SUCCESS", "FAILED", "REFUNDED"];
+
 export const createPaymentSchemaZ = z.object({
-  transactionId: z.string(),
   userId: z.string(),
   amount: z.number().nonnegative(),
   paymentMode: z.string(),
-  paymentStatus: z.enum(["pending", "successful", "failed"]),
+  paymentStatus: z.enum(paymentStatus),
 });
 
 export const paymentFilterSchemaZ = z.object({
   userId: z.string().optional(),
-  paymentStatus: z.enum(["pending", "successful", "failed"]).optional(),
+  status: z.enum(paymentStatus).optional(),
   paymentMode: z.string().optional(),
   fromDate: z.string().optional(),
   toDate: z.string().optional(),
   page: z.string().optional(),
 });
 
-export const paymentParamsSchemaZ = z.object({
-  transactionId: z.string(),
-});
-
-export const PaymentSchema = z.object({
-  paymentId: z.string(),
+export const paymentSchemaZ = z.object({
+  _id: z
+    .object({
+      $oid: z.string(),
+    })
+    .optional(),
   bookingId: z.string(),
+  paymentId: z.string(),
   userId: z.string(),
   amount: z.number(),
   razorpay_order_id: z.string(),
   razorpay_payment_id: z.string(),
-  paymentMode: z.string().optional(),
-  status: z.enum(["captured", "failed", "refunded", "pending"]),
-  createdAt: z.preprocess((v) => new Date(v as string), z.date()),
-  updatedAt: z.preprocess((v) => new Date(v as string), z.date()),
+  status: z.enum(paymentStatus),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
 });
 
-export type Payment = z.infer<typeof PaymentSchema>;
-export type CreatePaymentInput = z.infer<typeof createPaymentSchemaZ>;
-export type PaymentFilterInput = z.infer<typeof paymentFilterSchemaZ>;
-export type PaymentParamsInput = z.infer<typeof paymentParamsSchemaZ>;
+export const createPaymentInputSchemaZ = paymentSchemaZ.omit({
+  _id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const paymentParamsInputSchemaZ = z
+  .object({
+    paymentId: z.string().optional(),
+    bookingId: z.string().optional(),
+  })
+  .refine((data) => data.paymentId || data.bookingId, {
+    message: "Either paymentId or bookingId must be provided",
+    path: ["paymentId", "bookingId"],
+  });
+
+export const paymentFilterInputSchemaZ = z.object({
+  userId: z.string().optional(),
+  status: z.enum(paymentStatus).optional(),
+  fromDate: z.date().optional(),
+  toDate: z.date().optional(),
+  bookingId: z.string().optional(),
+  paymentId: z.string().optional(),
+  page: z.number().optional(),
+  limit: z.number().optional(),
+});
+
+export type Payment = z.infer<typeof paymentSchemaZ>;
+export type CreatePaymentInput = z.infer<typeof createPaymentInputSchemaZ>;
+export type PaymentFilterInput = z.infer<typeof paymentFilterInputSchemaZ>;
+export type PaymentParamsInput = z.infer<typeof paymentParamsInputSchemaZ>;

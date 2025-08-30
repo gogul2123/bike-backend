@@ -85,6 +85,16 @@ export async function getBikeById(bikeId: string): Promise<Bike | null> {
   )) as Bike | null;
 }
 
+export async function getBikesByIds(bikeIds: string[]): Promise<Bike[]> {
+  const col = await getCollection("bikes");
+  return await col
+    .find(
+      { bikeId: { $in: bikeIds } },
+      { projection: { _id: 0, pricing: 1, vehicles: 1 } }
+    )
+    .toArray();
+}
+
 export async function getBikesService(filters: {
   page?: number;
   limit?: number;

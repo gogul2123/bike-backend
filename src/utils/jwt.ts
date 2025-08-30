@@ -1,7 +1,7 @@
 // utils/jwt.ts
 import jwt from "jsonwebtoken";
-import { JWTPayload } from "../types";
-import { envConfig } from "../config/env";
+import { envConfig } from "../config/env.ts";
+import { JWTPayload } from "../types/index.ts";
 
 export function generateToken(payload: JWTPayload): string {
   return jwt.sign(payload, envConfig.jwtSecret, { expiresIn: "7d" });

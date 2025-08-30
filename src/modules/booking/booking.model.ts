@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { BookingVehicleInput } from "../bike/bike.model.ts";
 
-const paymentStatus = ["PENDING", "SUCCESS", "FAILED", "REFUNDED"];
 const bookingStatus = [
   "INITIATED",
   "CONFIRMED",
@@ -195,21 +194,6 @@ export const CreateBookingInput = z
 export const UpdateBookingInput = z.object({
   bookingId: z.string().min(1, "BookingId is required"),
   bookingStatus: z.enum(bookingStatus).optional(),
-  payment: z
-    .object({
-      paymentId: z.string().optional(),
-      paymentStatus: z.enum(paymentStatus).optional(),
-      paymentMethod: z.string().optional(),
-      transactionDate: z.preprocess(
-        (v) => (v ? new Date(v as string) : undefined),
-        z.date().optional()
-      ),
-      razorpayOrderId: z.string().optional(),
-      razorpayPaymentId: z.string().optional(),
-      razorpaySignature: z.string().optional(),
-    })
-    .partial()
-    .optional(),
   features: z
     .object({
       pickupLocation: z.string().optional(),

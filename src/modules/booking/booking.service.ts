@@ -9,6 +9,7 @@ import {
   holdMultipleVehicles,
   releaseMultipleVehicles,
   bookMultipleVehicles,
+  getBikesByIds,
 } from "../bike/bike.service.ts";
 import { savePayment, updatePayment } from "../payment/payment.service.ts";
 import { generateNumericEpochId } from "../../utils/generator.ts";
@@ -28,77 +29,133 @@ import {
   CancelBookingInput,
   BookingQueryInput,
 } from "./booking.model.ts";
+import { Bike } from "../bike/bike.model.ts";
 
 export const BOOK_HOLD_DURATION = 15 * 60 * 1000; // 15 minutes
 
 // Helper function to calculate days between dates
-function calculateDays(fromDate: Date, toDate: Date): number {
-  const diffTime = Math.abs(toDate.getTime() - fromDate.getTime());
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-}
+// function calculateDays(fromDate: Date, toDate: Date): number {
+//   const diffTime = Math.abs(toDate.getTime() - fromDate.getTime());
+//   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+// }
 
-// Helper function to count weekend days in a date range
-function countWeekendDays(fromDate: Date, toDate: Date): number {
-  let weekendCount = 0;
-  const currentDate = new Date(fromDate);
+// // Helper function to count weekend days in a date range
+// function countWeekendDays(fromDate: Date, toDate: Date): number {
+//   let weekendCount = 0;
+//   const currentDate = new Date(fromDate);
 
-  while (currentDate <= toDate) {
-    const dayOfWeek = currentDate.getDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      // Sunday = 0, Saturday = 6
-      weekendCount++;
-    }
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
+//   while (currentDate <= toDate) {
+//     const dayOfWeek = currentDate.getDay();
+//     if (dayOfWeek === 0 || dayOfWeek === 6) {
+//       // Sunday = 0, Saturday = 6
+//       weekendCount++;
+//     }
+//     currentDate.setDate(currentDate.getDate() + 1);
+//   }
 
-  return weekendCount;
-}
+//   return weekendCount;
+// }
 
-// Helper function to calculate pricing breakdown
+// // Helper function to calculate pricing breakdown
+// async function calculatePricingBreakdown(
+//   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
+//   fromDate: Date,
+//   toDate: Date
+// ): Promise<PricingBreakdown> {
+//   const totalDays = calculateDays(fromDate, toDate);
+//   const totalWeekendCount = countWeekendDays(fromDate, toDate);
+//   const totalWeekdayCount = totalDays - totalWeekendCount;
+
+//   const items: ItemPricingBreakdown[] = [];
+//   let totalBaseAmount = 0;
+//   let totalWeekendAmount = 0;
+//   let subtotalAmount = 0;
+
+//   // Get bike details for each vehicle and calculate pricing
+//   for (const vehicle of vehicles) {
+//     const bike = await getBikeById(vehicle.bikeId);
+//     if (!bike) {
+//       throw new Error(`Bike not found: ${vehicle.bikeId}`);
+//     }
+
+//     const basePrice = bike.pricing.basePrice;
+//     const weekendMultiplier = bike.pricing.weekendMultiplier;
+//     const weekdayAmount = totalWeekdayCount * basePrice;
+//     const weekendAmount = totalWeekendCount * basePrice * weekendMultiplier;
+//     const vehicleSubtotal = weekdayAmount + weekendAmount;
+//     totalBaseAmount += weekdayAmount;
+//     totalWeekendAmount += weekendAmount;
+//     subtotalAmount += vehicleSubtotal;
+//   }
+
+//   // Calculate tax (you can modify this logic as needed)
+//   const taxAmount = subtotalAmount * 0.18; // 18% GST
+//   const totalAmount = subtotalAmount + taxAmount;
+
+//   return {
+//     totalBaseAmount,
+//     totalWeekendAmount,
+//     subtotalAmount,
+//     taxAmount,
+//     discountAmount: 0,
+//     totalAmount,
+//     totalDays,
+//     totalWeekdayCount,
+//     totalWeekendCount,
+//     currency: "INR",
+//   };
+// }
+
 async function calculatePricingBreakdown(
   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
   fromDate: Date,
   toDate: Date
 ): Promise<PricingBreakdown> {
-  const totalDays = calculateDays(fromDate, toDate);
-  const totalWeekendCount = countWeekendDays(fromDate, toDate);
-  const totalWeekdayCount = totalDays - totalWeekendCount;
+  // Validate dates
+  if (fromDate > toDate) {
+    throw new Error("fromDate cannot be after toDate");
+  }
 
-  const items: ItemPricingBreakdown[] = [];
-  let totalBaseAmount = 0;
-  let totalWeekendAmount = 0;
-  let subtotalAmount = 0;
+  // Calculate days as 24-hour periods
+  const totalDays = calculate24HourDays(fromDate, toDate);
 
-  // Get bike details for each vehicle and calculate pricing
-  for (const vehicle of vehicles) {
-    const bike = await getBikeById(vehicle.bikeId);
-    if (!bike) {
-      throw new Error(`Bike not found: ${vehicle.bikeId}`);
-    }
+  // Count weekend and weekday portions within the total days
+  const { weekendDays, weekdayDays } = calculateWeekendWeekdayDays(
+    fromDate,
+    toDate,
+    totalDays
+  );
 
+  // Get all bike details in a single query (no loops)
+  const bikeIds = vehicles.map((v) => v.bikeId);
+  const bikes = await getBikesByIds(bikeIds);
+
+  if (bikes.length !== vehicles.length) {
+    throw new Error("Some bikes not found");
+  }
+
+  // Calculate pricing using functional array methods (no explicit loops)
+  const pricingCalculations = bikes.map((bike) => {
     const basePrice = bike.pricing.basePrice;
     const weekendMultiplier = bike.pricing.weekendMultiplier;
 
-    const weekdayAmount = totalWeekdayCount * basePrice;
-    const weekendAmount = totalWeekendCount * basePrice * weekendMultiplier;
-    const vehicleSubtotal = weekdayAmount + weekendAmount;
+    // Calculate amounts based on day portions
+    const weekdayAmount = weekdayDays * basePrice;
+    const weekendAmount = weekendDays * basePrice * weekendMultiplier;
 
-    // items.push({
-    //   bikeId: vehicle.bikeId,
-    //   vehicleNumber: vehicle.vehicleNumber,
-    //   baseAmount: weekdayAmount,
-    //   weekendAmount: weekendAmount,
-    //   subtotal: vehicleSubtotal,
-    //   weekdayCount: totalWeekdayCount,
-    //   weekendCount: totalWeekendCount,
-    // });
+    return { weekdayAmount, weekendAmount };
+  });
 
-    totalBaseAmount += weekdayAmount;
-    totalWeekendAmount += weekendAmount;
-    subtotalAmount += vehicleSubtotal;
-  }
+  // Sum all amounts using reduce
+  const { totalBaseAmount, totalWeekendAmount } = pricingCalculations.reduce(
+    (acc, curr) => ({
+      totalBaseAmount: acc.totalBaseAmount + curr.weekdayAmount,
+      totalWeekendAmount: acc.totalWeekendAmount + curr.weekendAmount,
+    }),
+    { totalBaseAmount: 0, totalWeekendAmount: 0 }
+  );
 
-  // Calculate tax (you can modify this logic as needed)
+  const subtotalAmount = totalBaseAmount + totalWeekendAmount;
   const taxAmount = subtotalAmount * 0.18; // 18% GST
   const totalAmount = subtotalAmount + taxAmount;
 
@@ -110,10 +167,77 @@ async function calculatePricingBreakdown(
     discountAmount: 0,
     totalAmount,
     totalDays,
-    totalWeekdayCount,
-    totalWeekendCount,
+    totalWeekdayCount: weekdayDays,
+    totalWeekendCount: weekendDays,
     currency: "INR",
   };
+}
+
+// Calculate days as 24-hour periods
+function calculate24HourDays(fromDate: Date, toDate: Date): number {
+  const diffTime = toDate.getTime() - fromDate.getTime();
+  const diffHours = diffTime / (1000 * 60 * 60);
+
+  // Always round up to next day if more than 24 hours
+  return Math.max(1, Math.ceil(diffHours / 24));
+}
+
+// Calculate weekend/weekday portions based on when rental starts and total days
+function calculateWeekendWeekdayDays(
+  fromDate: Date,
+  toDate: Date,
+  totalDays: number
+): { weekendDays: number; weekdayDays: number } {
+  if (totalDays === 1) {
+    // For 1 day (24 hours or less), check start day
+    const startDay = fromDate.getDay();
+    const isWeekend = startDay === 0 || startDay === 6; // Sunday = 0, Saturday = 6
+
+    return {
+      weekendDays: isWeekend ? 1 : 0,
+      weekdayDays: isWeekend ? 0 : 1,
+    };
+  }
+
+  // For multi-day rentals, count actual weekend/weekday days in the period
+  let weekendDays = 0;
+  let current = new Date(fromDate);
+
+  for (let i = 0; i < totalDays; i++) {
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      weekendDays++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  const weekdayDays = totalDays - weekendDays;
+
+  return { weekendDays, weekdayDays };
+}
+
+// Batch bike retrieval function
+
+// Alternative optimized weekend counting (mathematical approach)
+function countWeekendsOptimized(fromDate: Date, toDate: Date): number {
+  const from = new Date(fromDate);
+  const to = new Date(toDate);
+
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+
+  let weekendCount = 0;
+  let current = new Date(from);
+
+  while (current <= to) {
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      weekendCount++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return weekendCount;
 }
 
 // Helper function to create booking vehicles with denormalized data
@@ -176,6 +300,10 @@ export async function createBookingOrderService(
     validatedData.toDate
   );
 
+  console.log("Pricing Breakdown:", pricingBreakdown);
+
+  // Hold all vehicles
+
   try {
     const result = await holdMultipleVehicles(
       validatedData.vehicles,
@@ -211,7 +339,10 @@ export async function createBookingOrderService(
   });
 
   // Calculate metadata
-  const totalDays = calculateDays(validatedData.fromDate, validatedData.toDate);
+  const totalDays = calculate24HourDays(
+    validatedData.fromDate,
+    validatedData.toDate
+  );
   const uniqueModels = new Set(
     bookingVehicles.map((v) => `${v.brand}_${v.modelName}`)
   );
@@ -225,11 +356,6 @@ export async function createBookingOrderService(
     toDate: validatedData.toDate,
     totalDays,
     pricing: pricingBreakdown,
-    // payment: {
-    //   orderId: order.id,
-    //   paymentStatus: "PENDING",
-    //   razorpayOrderId: order.id,
-    // },
     bookingStatus: "INITIATED",
     features: validatedData.features,
     metadata: {
@@ -417,13 +543,6 @@ export async function updateBookingService(
 
   if (validatedData.bookingStatus) {
     updateFields.bookingStatus = validatedData.bookingStatus;
-  }
-
-  if (validatedData.payment) {
-    Object.keys(validatedData.payment).forEach((key) => {
-      updateFields[`payment.${key}`] =
-        validatedData.payment![key as keyof typeof validatedData.payment];
-    });
   }
 
   if (validatedData.features) {
