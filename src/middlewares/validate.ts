@@ -44,7 +44,7 @@
 // };
 
 import { RequestHandler } from "express";
-import { z, ZodError, ZodObject } from "zod";
+import { ZodObject, ZodError } from "zod";
 
 export const validateZod = (schema: ZodObject<any>): RequestHandler => {
   return (req, res, next) => {
@@ -65,8 +65,12 @@ export const validateZod = (schema: ZodObject<any>): RequestHandler => {
       const result = schema.safeParse(data);
       if (result.success) {
         parsedData = result.data;
-        req[key as keyof typeof sources] = parsedData;
-        return next(); // ✅ Pass validation
+
+        // ✅ instead of overwriting req.query/params/body, store in req.validated
+        if (!(req as any).validated) (req as any).validated = {};
+        (req as any).validated[key] = parsedData;
+
+        return next();
       } else {
         firstError ??= result.error;
       }
@@ -79,7 +83,6 @@ export const validateZod = (schema: ZodObject<any>): RequestHandler => {
       })) ?? [];
 
     res.status(400).json({ success: false, errors });
-    // Ensure the middleware returns void
     return;
   };
 };
