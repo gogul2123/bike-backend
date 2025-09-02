@@ -29,6 +29,7 @@ export const updateUserHanlder = async (req: Request, res: Response) => {
 export const UpdateInitialData = async (req: Request, res: Response) => {
   try {
     const updateData = req.body;
+    console.log("data", updateData);
     const updatedUser = await updateUserInitialData(updateData);
     if (!updatedUser) {
       sendError(res, 404, "User not found");

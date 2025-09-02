@@ -6,6 +6,7 @@ import { validateZod } from "../../middlewares/validate.ts";
 const router = Router();
 
 router.post("/update-user", validateZod(updateUserSchemaZ), updateUserHanlder);
+
 router.post(
   "/update-initial-data",
   validateZod(updateInitialDataSchemaZ),

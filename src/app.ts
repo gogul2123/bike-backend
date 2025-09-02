@@ -9,14 +9,17 @@ import bikeRoute from "./modules/bike/bike.routes.ts";
 import bookingRoute from "./modules/booking/booking.routes.ts";
 import paymentRoute from "./modules/payment/payment.route.ts";
 
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  credentials: true,
-}));
-app.use(express.json());
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    credentials: true,
+  })
+);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoute);
 app.use("/api/bike", bikeRoute);
