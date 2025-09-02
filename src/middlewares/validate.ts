@@ -1,6 +1,48 @@
+// // middlewares/validate.ts
+// import { RequestHandler } from "express";
+// import { z, ZodError, ZodObject } from "zod";
+
+// export const validateZod = (schema: ZodObject<any>): RequestHandler => {
+//   return (req, res, next) => {
+//     const sources = {
+//       body: req.body,
+//       query: req.query,
+//       params: req.params,
+//     };
+
+//     // Try validation against each source (body, query, params) using the same schema
+//     // Only one must succeed (whichever contains the matching fields)
+//     let parsedData = null;
+//     let firstError = null;
+
+//     for (const [key, data] of Object.entries(sources)) {
+//       const result = schema.safeParse(data);
+//       if (result.success) {
+//         parsedData = result.data;
+//         req[key as keyof typeof sources] = parsedData;
+//         return next(); // ✅ Pass validation
+//       } else {
+//         firstError ??= result.error;
+//       }
+//     }
+
+  
+
+//     const errors =
+//       firstError?.issues.map((err) => ({
+//         field: err.path.join("."),
+//         message: err.message,
+//       })) ?? [];
+
+//     res.status(400).json({ success: false, errors });
+//     // Ensure the middleware returns void
+//     return;
+//   };
+// };
+
 // middlewares/validate.ts
 import { RequestHandler } from "express";
-import { z, ZodError, ZodObject } from "zod";
+import { ZodObject, ZodError } from "zod";
 
 export const validateZod = (schema: ZodObject<any>): RequestHandler => {
   return (req, res, next) => {
@@ -10,19 +52,19 @@ export const validateZod = (schema: ZodObject<any>): RequestHandler => {
       params: req.params,
     };
 
-    console.log("sources:", sources.body.vehicles);
-
-    // Try validation against each source (body, query, params) using the same schema
-    // Only one must succeed (whichever contains the matching fields)
-    let parsedData = null;
-    let firstError = null;
+    let parsedData: any = null;
+    let firstError: ZodError | null = null;
 
     for (const [key, data] of Object.entries(sources)) {
       const result = schema.safeParse(data);
       if (result.success) {
         parsedData = result.data;
-        req[key as keyof typeof sources] = parsedData;
-        return next(); // ✅ Pass validation
+
+        // ✅ instead of overwriting req.query/params/body, store in req.validated
+        if (!(req as any).validated) (req as any).validated = {};
+        (req as any).validated[key] = parsedData;
+
+        return next();
       } else {
         firstError ??= result.error;
       }
@@ -35,7 +77,6 @@ export const validateZod = (schema: ZodObject<any>): RequestHandler => {
       })) ?? [];
 
     res.status(400).json({ success: false, errors });
-    // Ensure the middleware returns void
     return;
   };
 };

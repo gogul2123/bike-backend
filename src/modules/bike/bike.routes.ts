@@ -47,7 +47,7 @@ router.post(
 
 router.get("/getById/:bikeId", validateZod(bikeIdSchema), getBikeByIdHandler);
 router.get(
-  "/gateAllBikes",
+  "/getAllBikes",
   validateZod(AvailabilityQueryInput.partial()),
   getBikesHandler
 );
