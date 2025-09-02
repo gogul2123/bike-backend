@@ -6,7 +6,6 @@ import { sendError, sendSuccess } from "../../utils/response.ts";
 import { envConfig } from "../../config/env.ts";
 import { getCollection } from "../db/database.ts";
 import bcrypt from "bcrypt";
-import { email } from "zod";
 import { generateNumericEpochId } from "../../utils/generator.ts";
 import { sendMail, sendOTPMail } from "../../services/gmail.service.ts";
 import { getOrCreateUser } from "../user/user.service.ts";
