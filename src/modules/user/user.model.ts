@@ -61,8 +61,14 @@ export const googleAuthSchema = z.object({
   accessToken: z.string().min(1),
 });
 
+export const getUser = z.object({
+  userId: z.string().nonempty("User ID is required."),
+});
+
+
 export type User = z.infer<typeof userSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;
 export type UpdateInitialDataInput = z.infer<typeof updateInitialDataSchemaZ>;
 export type UpdateUserInput = z.infer<typeof updateUserSchemaZ>;
+export type GetUserInput = z.infer<typeof getUser>;

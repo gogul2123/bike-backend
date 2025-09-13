@@ -7,7 +7,7 @@ import {
 } from "./user.service.ts";
 import { generateToken } from "../../utils/jwt.ts";
 
-export const updateUserHanlder = async (req: Request, res: Response) => {
+export const updateUserHandler = async (req: Request, res: Response) => {
   try {
     const updateData = req.body;
     const updatedUser = await updateUser({
@@ -43,6 +43,22 @@ export const UpdateInitialData = async (req: Request, res: Response) => {
     );
   } catch (error) {
     console.error("Error updating initial data:", error);
+    sendError(res, 500, "Internal server error");
+  }
+};
+
+export const getUserHandler = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+    const user = await getUserByID(userId);
+    if (!user) {
+      sendError(res, 404, "User not found");
+      return;
+    }
+
+    sendSuccess(res, user, "User retrieved successfully");
+  } catch (error) {
+    console.error("Error retrieving user:", error);
     sendError(res, 500, "Internal server error");
   }
 };
