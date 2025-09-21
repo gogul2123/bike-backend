@@ -279,7 +279,11 @@ async function createBookingVehicles(
 
 export async function createBookingOrderService(
   data: CreateBookingInputType
-): Promise<{ orderId: string; razorpayKey: string; booking: Booking }> {
+): Promise<{
+  orderId: string;
+  razorpayKey: string;
+  bookingId: Booking["bookingId"];
+}> {
   // Validate input
   const validatedData = CreateBookingInput.parse(data);
 
@@ -289,7 +293,7 @@ export async function createBookingOrderService(
   // Create booking vehicles with denormalized data
   const bookingVehicles = await createBookingVehicles(validatedData.vehicles);
 
-  console.log("validated Data", validatedData);
+  console.log("validated Data--->", validatedData);
 
   // Calculate pricing breakdown
   const pricingBreakdown = await calculatePricingBreakdown(
@@ -388,7 +392,7 @@ export async function createBookingOrderService(
   return {
     orderId: order.id,
     razorpayKey: process.env.RAZORPAY_KEY_ID!,
-    booking: validatedBooking,
+    bookingId: bookingData.bookingId,
   };
 }
 
@@ -411,10 +415,6 @@ export async function completeBookingPaymentService(
     .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
-
-  console.log("Generated Signature:", generatedSignature);
-  console.log("Received Signature:", razorpay_signature);
-  console.log(generatedSignature === razorpay_signature);
 
   await releaseMultipleVehicles(
     booking.vehicles,
@@ -448,22 +448,6 @@ export async function completeBookingPaymentService(
         "INR"
       );
 
-      // Release all held vehicles
-
-      // Confirm booking for all vehicles
-      // const bookPromises = booking.vehicles.map((vehicle) =>
-      //   bookBike(vehicle.bikeId, vehicle.vehicleNumber)
-      // );
-      // await Promise.all(bookPromises);
-
-      // if (result) {
-      //   await bookMultipleVehicles(
-      //     booking.vehicles,
-      //     BOOK_HOLD_DURATION,
-      //     booking.userId as Booking["userId"]
-      //   );
-      // }
-
       // Update booking status
       const updatedBooking = await bookingCollection.findOneAndUpdate(
         { bookingId },
@@ -481,19 +465,6 @@ export async function completeBookingPaymentService(
       );
 
       await updatePayment(bookingId, "SUCCESS", razorpay_payment_id);
-
-      // Save payment record
-      // await savePayment({
-      //   bookingId,
-      //   paymentId: generateNumericEpochId("PAY"),
-      //   userId: booking.userId,
-      //   amount: booking.pricing.totalAmount,
-      //   razorpay_order_id,
-      //   razorpay_payment_id,
-      //   status: "captured",
-      //   createdAt: new Date(),
-      //   updatedAt: new Date(),
-      // });
 
       return { success: true, booking: updatedBooking as Booking };
     } catch (error) {
@@ -514,7 +485,6 @@ export async function completeBookingPaymentService(
             },
           }
         );
-
         return {
           success: false,
           error: `Payment capture failed: ${error.message}`,
@@ -578,30 +548,24 @@ export async function cancelBookingService(
     throw new Error("Booking not found");
   }
 
-  const paymentCol = await getCollection("payments");
-  const payment = await paymentCol.findOne({
-    bookingId: validatedData.bookingId,
-  });
-
-  // Check if booking can be cancelled
   if (["COMPLETED", "CANCELLED"].includes(booking.bookingStatus)) {
     throw new Error(
       `Cannot cancel booking with status: ${booking.bookingStatus}`
     );
   }
 
-  // Release all vehicles
-  const releasePromises = booking.vehicles.map((vehicle) =>
-    releaseBike(vehicle.bikeId, vehicle.vehicleNumber)
+  await releaseMultipleVehicles(
+    booking.vehicles,
+    BOOK_HOLD_DURATION,
+    booking.userId as Booking["userId"]
   );
-  await Promise.all(releasePromises);
 
   // Process refund if payment was successful
-  let refundAmount = 0;
-  if (payment.status === "SUCCESS" && validatedData.refundAmount) {
-    refundAmount = validatedData.refundAmount;
-    // You can implement actual refund logic here with Razorpay
-  }
+  // let refundAmount = 0;
+  // if (payment.status === "SUCCESS" && validatedData.refundAmount) {
+  //   refundAmount = validatedData.refundAmount;
+  //   // You can implement actual refund logic here with Razorpay
+  // }
 
   // Update booking
   const updatedBooking = await bookingCollection.findOneAndUpdate(
@@ -609,14 +573,11 @@ export async function cancelBookingService(
     {
       $set: {
         bookingStatus: "CANCELLED",
-        "metadata.cancellationReason": validatedData.cancellationReason,
-        "metadata.refundAmount": refundAmount,
         updatedAt: new Date(),
       },
     },
     { returnDocument: "after" }
   );
-
   return updatedBooking.value as Booking;
 }
 

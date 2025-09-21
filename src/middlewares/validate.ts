@@ -136,11 +136,7 @@ export const validateZod = (schema: ZodObject<any>): RequestHandler => {
       params: req.params,
     });
 
-    console.log(mergedData);
-
     const result = schema.safeParse(mergedData);
-
-    console.log(result);
 
     if (result.success) {
       (req as any).validated = result.data; // store validated data

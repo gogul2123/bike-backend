@@ -210,8 +210,6 @@ export const UpdateBookingInput = z.object({
 
 export const CancelBookingInput = z.object({
   bookingId: z.string().min(1, "BookingId is required"),
-  cancellationReason: z.string().min(1, "Cancellation reason is required"),
-  refundAmount: z.number().nonnegative().optional(),
 });
 
 export const BookingQueryInput = z.object({
