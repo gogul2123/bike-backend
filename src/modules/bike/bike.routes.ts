@@ -46,7 +46,8 @@ router.post(
 );
 
 router.get("/getById/:bikeId", validateZod(bikeIdSchema), getBikeByIdHandler);
-router.get(
+
+router.post(
   "/getAllBikes",
   validateZod(AvailabilityQueryInput.partial()),
   getBikesHandler
@@ -85,8 +86,8 @@ router.delete(
 );
 
 // Availability routes
-router.get(
-  "/:bikeId/availability/check",
+router.post(
+  "/availableBikes",
   validateZod(AvailabilityQueryInput),
   checkAvailabilityHandler
 );

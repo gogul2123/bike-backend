@@ -184,6 +184,8 @@ export const AvailabilityQueryInput = z
     transmission: z.enum(transmission).optional(),
     brand: z.string().optional(),
     minVehicles: z.number().positive().default(1),
+    page: z.number().positive().default(1),
+    limit: z.number().positive().default(10),
   })
   .refine((data) => data.toDate.getTime() > data.fromDate.getTime(), {
     message: "toDate must be after fromDate",
@@ -222,6 +224,61 @@ export const CreateBikeInputWithFile = CreateBikeInput.extend({
 export const UpdateBikeInputWithFile = UpdateBikeInput.extend({
   imageFile: fileSchema.optional(),
 });
+
+export interface AvailableBikeResponse {
+  success: boolean;
+  data: {
+    bikes: Array<{
+      bikeId: string;
+      modelInfo: {
+        brand: string;
+        model: string;
+        category: string;
+        type: string;
+        transmission: string;
+        description: string;
+        imageUrl: string;
+        specifications: {
+          engine: string;
+          mileage: string;
+          fuelType: string;
+          weight: string;
+          topSpeed: string;
+        };
+      };
+      pricing: {
+        basePrice: number;
+        weekendMultiplier: number;
+        currency: string;
+        taxIncluded: boolean;
+      };
+      vehicles: Array<{
+        vehicleId: string;
+        vehicleNumber: string;
+        status: "AVAILABLE";
+        condition: string;
+        location: string;
+        metadata: {
+          lastServiceDate: Date;
+          nextServiceDue: Date;
+          totalKms: number;
+          purchaseDate: Date;
+          lastUpdated: Date;
+        };
+      }>;
+      availableCount: number;
+    }>;
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      limit: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  };
+  message?: string;
+}
 
 export type Bike = z.infer<typeof BikeSchema>;
 export type Vehicle = z.infer<typeof VehicleSchema>;

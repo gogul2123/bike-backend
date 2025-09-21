@@ -156,14 +156,12 @@ async function calculatePricingBreakdown(
   );
 
   const subtotalAmount = totalBaseAmount + totalWeekendAmount;
-  const taxAmount = subtotalAmount * 0.18; // 18% GST
-  const totalAmount = subtotalAmount + taxAmount;
+  const totalAmount = subtotalAmount;
 
   return {
     totalBaseAmount,
     totalWeekendAmount,
     subtotalAmount,
-    taxAmount,
     discountAmount: 0,
     totalAmount,
     totalDays,
@@ -291,7 +289,7 @@ export async function createBookingOrderService(
   // Create booking vehicles with denormalized data
   const bookingVehicles = await createBookingVehicles(validatedData.vehicles);
 
-  console.log("Booking Vehicles:", bookingVehicles);
+  console.log("validated Data", validatedData);
 
   // Calculate pricing breakdown
   const pricingBreakdown = await calculatePricingBreakdown(
@@ -418,21 +416,21 @@ export async function completeBookingPaymentService(
   console.log("Received Signature:", razorpay_signature);
   console.log(generatedSignature === razorpay_signature);
 
+  await releaseMultipleVehicles(
+    booking.vehicles,
+    BOOK_HOLD_DURATION,
+    booking.userId as Booking["userId"]
+  );
+
   if (generatedSignature !== razorpay_signature) {
     // Release all held vehicles
-
-    await releaseMultipleVehicles(
-      booking.vehicles,
-      BOOK_HOLD_DURATION,
-      booking.userId as Booking["userId"]
-    );
 
     // Update booking status
     await bookingCollection.updateOne(
       { bookingId },
       {
         $set: {
-          "payment.paymentStatus": "FAILED",
+          "payment.status": "FAILED",
           "payment.razorpayPaymentId": razorpay_payment_id,
           bookingStatus: "CANCELLED",
           updatedAt: new Date(),
@@ -450,8 +448,6 @@ export async function completeBookingPaymentService(
         "INR"
       );
 
-      console.log("Payment captured:", result);
-
       // Release all held vehicles
 
       // Confirm booking for all vehicles
@@ -460,20 +456,20 @@ export async function completeBookingPaymentService(
       // );
       // await Promise.all(bookPromises);
 
-      if (result) {
-        await bookMultipleVehicles(
-          booking.vehicles,
-          BOOK_HOLD_DURATION,
-          booking.userId as Booking["userId"]
-        );
-      }
+      // if (result) {
+      //   await bookMultipleVehicles(
+      //     booking.vehicles,
+      //     BOOK_HOLD_DURATION,
+      //     booking.userId as Booking["userId"]
+      //   );
+      // }
 
       // Update booking status
       const updatedBooking = await bookingCollection.findOneAndUpdate(
         { bookingId },
         {
           $set: {
-            "payment.paymentStatus": "SUCCESS",
+            "payment.status": "SUCCESS",
             "payment.paymentId": razorpay_payment_id,
             "payment.razorpayPaymentId": razorpay_payment_id,
             "payment.transactionDate": new Date(),
@@ -484,7 +480,7 @@ export async function completeBookingPaymentService(
         { returnDocument: "after" }
       );
 
-      await updatePayment(bookingId, "captured", razorpay_payment_id);
+      await updatePayment(bookingId, "SUCCESS", razorpay_payment_id);
 
       // Save payment record
       // await savePayment({
@@ -512,7 +508,7 @@ export async function completeBookingPaymentService(
           { bookingId },
           {
             $set: {
-              "payment.paymentStatus": "FAILED",
+              "payment.status": "FAILED",
               bookingStatus: "CANCELLED",
               updatedAt: new Date(),
             },
@@ -602,7 +598,7 @@ export async function cancelBookingService(
 
   // Process refund if payment was successful
   let refundAmount = 0;
-  if (payment.paymentStatus === "SUCCESS" && validatedData.refundAmount) {
+  if (payment.status === "SUCCESS" && validatedData.refundAmount) {
     refundAmount = validatedData.refundAmount;
     // You can implement actual refund logic here with Razorpay
   }
@@ -634,7 +630,10 @@ export async function getBookingByIdService(
   )) as Booking | null;
 }
 
-export async function getBookingsService(filters: BookingQueryInputType) {
+export async function getBookingsService(
+  filters: BookingQueryInputType,
+  projection?: any
+) {
   const validatedFilters = BookingQueryInput.parse(filters);
   const bookingCollection = await getCollection("bookings");
 
@@ -674,7 +673,7 @@ export async function getBookingsService(filters: BookingQueryInputType) {
           { $sort: { createdAt: -1 } },
           { $skip: (page - 1) * limit },
           { $limit: limit },
-          { $project: { _id: 0 } },
+          { $project: { _id: 0, ...projection } },
         ],
         totalCount: [{ $count: "count" }],
       },
@@ -725,7 +724,7 @@ export async function cleanupExpiredHoldsService(): Promise<{
     {
       bookingStatus: "INITIATED",
       createdAt: { $lt: expiredTime },
-      "payment.paymentStatus": "PENDING",
+      "payment.status": "PENDING",
     },
     {
       $set: {
@@ -855,7 +854,9 @@ interface VehicleLateCharge {
 
 interface LateDeliveryBreakdown {
   bookingId: string;
+  userId: string;
   fromDate: Date;
+  toDate: string;
   currentDate: Date;
   totalLateHours: number;
   vehicles: VehicleLateCharge[];
@@ -863,10 +864,196 @@ interface LateDeliveryBreakdown {
   currency: string;
 }
 
+// export async function calculateLateDeliveryCharges(
+//   bookingId: string,
+//   currentDate: Date
+// ): Promise<LateDeliveryBreakdown | null> {
+//   const col = await getCollection("bookings");
+
+//   // MongoDB aggregation pipeline for optimized calculation and status update
+//   const pipeline = [
+//     // Match the specific booking
+//     {
+//       $match: {
+//         bookingId: bookingId,
+//       },
+//     },
+
+//     // Add calculated fields
+//     {
+//       $addFields: {
+//         // Calculate total late hours
+//         lateHours: {
+//           $ceil: {
+//             $divide: [
+//               {
+//                 $abs: {
+//                   $subtract: [currentDate, "$toDate"],
+//                 },
+//               },
+//               3600000, // Convert milliseconds to hours (1000 * 60 * 60)
+//             ],
+//           },
+//         },
+//         // Check if booking is actually late
+//         isLate: {
+//           $gt: [
+//             {
+//               $subtract: [currentDate, "$fromDate"],
+//             },
+//             0,
+//           ],
+//         },
+//       },
+//     },
+
+//     // Unwind vehicles array to process each vehicle
+//     {
+//       $unwind: "$vehicles",
+//     },
+
+//     // Add hourly rate calculation for each vehicle (only if late)
+//     {
+//       $addFields: {
+//         "vehicles.hourlyRate": {
+//           $cond: {
+//             if: "$isLate",
+//             then: {
+//               $switch: {
+//                 branches: [
+//                   {
+//                     case: { $lt: ["$vehicles.basePrice", 1000] },
+//                     then: 80,
+//                   },
+//                   {
+//                     case: {
+//                       $and: [
+//                         { $gte: ["$vehicles.basePrice", 1000] },
+//                         { $lte: ["$vehicles.basePrice", 1500] },
+//                       ],
+//                     },
+//                     then: 100,
+//                   },
+//                 ],
+//                 default: 120, // Above 1500
+//               },
+//             },
+//             else: 0,
+//           },
+//         },
+//         "vehicles.lateChargeAmount": {
+//           $cond: {
+//             if: "$isLate",
+//             then: {
+//               $multiply: [
+//                 "$lateHours",
+//                 {
+//                   $switch: {
+//                     branches: [
+//                       {
+//                         case: { $lt: ["$vehicles.basePrice", 1000] },
+//                         then: 80,
+//                       },
+//                       {
+//                         case: {
+//                           $and: [
+//                             { $gte: ["$vehicles.basePrice", 1000] },
+//                             { $lte: ["$vehicles.basePrice", 1500] },
+//                           ],
+//                         },
+//                         then: 100,
+//                       },
+//                     ],
+//                     default: 120,
+//                   },
+//                 },
+//               ],
+//             },
+//             else: 0,
+//           },
+//         },
+//         userId: "$userId",
+//       },
+//     },
+
+//     // Group back to get all vehicles with their calculations
+//     {
+//       $group: {
+//         _id: "$_id",
+//         bookingId: { $first: "$bookingId" },
+//         fromDate: { $first: "$fromDate" },
+//         totalLateHours: { $first: "$lateHours" },
+//         isLate: { $first: "$isLate" },
+//         vehicles: {
+//           $push: {
+//             bikeId: "$vehicles.bikeId",
+//             vehicleNumber: "$vehicles.vehicleNumber",
+//             modelName: "$vehicles.modelName",
+//             brand: "$vehicles.brand",
+//             basePrice: "$vehicles.basePrice",
+//             hourlyRate: "$vehicles.hourlyRate",
+//             lateHours: "$lateHours",
+//             lateChargeAmount: "$vehicles.lateChargeAmount",
+//           },
+//         },
+//         userId: { $first: "$userId" },
+//         totalLateChargeAmount: { $sum: "$vehicles.lateChargeAmount" },
+//       },
+//     },
+
+//     // Project final structure
+//     {
+//       $project: {
+//         _id: 0,
+//         bookingId: 1,
+//         fromDate: 1,
+//         totalLateHours: 1,
+//         isLate: 1,
+//         vehicles: 1,
+//         totalLateChargeAmount: 1,
+//         currency: "INR",
+//         userId: 1,
+//       },
+//     },
+//   ];
+
+//   const result = await col.aggregate(pipeline).toArray();
+
+//   if (result.length === 0) {
+//     return null; // Booking not found
+//   }
+
+//   const breakdown = result[0];
+
+//   // Update booking status to COMPLETED
+//   const updatedResult = await col.updateOne(
+//     { bookingId: bookingId },
+//     {
+//       $set: {
+//         bookingStatus: "COMPLETED",
+//         completedAt: currentDate,
+//       },
+//     }
+//   );
+
+//   if (updatedResult.modifiedCount === 0) {
+//     return null;
+//   }
+//   return {
+//     bookingId: breakdown.bookingId,
+//     fromDate: breakdown.fromDate,
+//     currentDate,
+//     totalLateHours: Math.max(0, breakdown.totalLateHours),
+//     vehicles: breakdown.vehicles,
+//     totalLateChargeAmount: breakdown.totalLateChargeAmount,
+//     currency: breakdown.currency,
+//   };
+// }
+
 export async function calculateLateDeliveryCharges(
   bookingId: string,
   currentDate: Date
-): Promise<LateDeliveryBreakdown | null | boolean> {
+): Promise<LateDeliveryBreakdown | null> {
   const col = await getCollection("bookings");
 
   // MongoDB aggregation pipeline for optimized calculation and status update
@@ -886,7 +1073,9 @@ export async function calculateLateDeliveryCharges(
           $ceil: {
             $divide: [
               {
-                $subtract: [currentDate, "$fromDate"],
+                $abs: {
+                  $subtract: [currentDate, "$toDate"],
+                },
               },
               3600000, // Convert milliseconds to hours (1000 * 60 * 60)
             ],
@@ -969,6 +1158,7 @@ export async function calculateLateDeliveryCharges(
             else: 0,
           },
         },
+        userId: "$userId",
       },
     },
 
@@ -978,6 +1168,7 @@ export async function calculateLateDeliveryCharges(
         _id: "$_id",
         bookingId: { $first: "$bookingId" },
         fromDate: { $first: "$fromDate" },
+        toDate: { $first: "$toDate" },
         totalLateHours: { $first: "$lateHours" },
         isLate: { $first: "$isLate" },
         vehicles: {
@@ -992,6 +1183,7 @@ export async function calculateLateDeliveryCharges(
             lateChargeAmount: "$vehicles.lateChargeAmount",
           },
         },
+        userId: { $first: "$userId" },
         totalLateChargeAmount: { $sum: "$vehicles.lateChargeAmount" },
       },
     },
@@ -1002,11 +1194,13 @@ export async function calculateLateDeliveryCharges(
         _id: 0,
         bookingId: 1,
         fromDate: 1,
+        toDate: 1,
         totalLateHours: 1,
         isLate: 1,
         vehicles: 1,
         totalLateChargeAmount: 1,
         currency: "INR",
+        userId: 1,
       },
     },
   ];
@@ -1033,16 +1227,16 @@ export async function calculateLateDeliveryCharges(
   if (updatedResult.modifiedCount === 0) {
     return null;
   }
-  if (breakdown.isLate && breakdown.totalLateHours > 0) {
-    return {
-      bookingId: breakdown.bookingId,
-      fromDate: breakdown.fromDate,
-      currentDate,
-      totalLateHours: Math.max(0, breakdown.totalLateHours),
-      vehicles: breakdown.vehicles,
-      totalLateChargeAmount: breakdown.totalLateChargeAmount,
-      currency: breakdown.currency,
-    };
-  }
-  return true;
+
+  return {
+    bookingId: breakdown.bookingId,
+    userId: breakdown.userId,
+    fromDate: breakdown.fromDate,
+    toDate: breakdown.toDate,
+    currentDate,
+    totalLateHours: Math.max(0, breakdown.totalLateHours),
+    vehicles: breakdown.vehicles,
+    totalLateChargeAmount: breakdown.totalLateChargeAmount,
+    currency: breakdown.currency,
+  };
 }

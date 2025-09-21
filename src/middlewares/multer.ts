@@ -16,7 +16,7 @@ const fileFilter = (
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter,
-  limits: { fileSize: 1 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 function optionalFileUpload(fieldName: string) {

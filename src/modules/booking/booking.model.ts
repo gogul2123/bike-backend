@@ -41,7 +41,6 @@ export const PricingBreakdownSchema = z.object({
   totalBaseAmount: z.number().nonnegative(),
   totalWeekendAmount: z.number().nonnegative(),
   subtotalAmount: z.number().positive(),
-  taxAmount: z.number().nonnegative().default(0),
   discountAmount: z.number().nonnegative().default(0),
   totalAmount: z.number().positive(),
   totalDays: z.number().positive(),
@@ -265,13 +264,15 @@ export const bookingsByStatusParamsSchema = z.object({
 
 // Combined validation schemas for each endpoint
 export const getUserBookingsSchema = z.object({
-  params: userBookingsParamsSchema,
-  query: paginationQuerySchema,
+  userId: z.string().min(1, "User ID is required"),
+  page: z.string().optional().default("1").transform(Number),
+  limit: z.string().optional().default("10").transform(Number),
 });
 
 export const getBookingsByStatusSchema = z.object({
-  params: bookingsByStatusParamsSchema,
-  query: paginationQuerySchema,
+  status: z.enum(bookingStatus),
+  page: z.string().optional().default("1").transform(Number),
+  limit: z.string().optional().default("10").transform(Number),
 });
 
 export type Booking = z.infer<typeof BookingSchema>;

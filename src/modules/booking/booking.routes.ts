@@ -69,7 +69,7 @@ router.get("/getAllBookings", validateZod(BookingQueryInput), getBookings);
 router.post(
   "/completeBookingById",
   validateZod(
-    BookingSchema.pick({ bookingId: true }).extend({ currentDate: z.date() })
+    BookingSchema.pick({ bookingId: true }).extend({ currentDate: z.string() })
   ),
   completeBookingById
 );

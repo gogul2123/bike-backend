@@ -127,14 +127,94 @@ export async function updateUser(data: UpdateUserInput): Promise<any | null> {
   return result;
 }
 
+// export async function getUserByID(
+//   userId: string,
+//   projection?: Record<string, any>
+// ): Promise<User | null> {
+//   const col = await getCollection("users");
+//   const user = await col.findOne(
+//     { userId },
+//     { projection: { password: 0, _id: 0, ...projection } }
+//   );
+//   return user;
+// }
+
 export async function getUserByID(
   userId: string,
   projection?: Record<string, any>
-): Promise<User | null> {
+): Promise<User | null | any> {
   const col = await getCollection("users");
-  const user = await col.findOne(
-    { userId },
-    { projection: { password: 0, _id: 0, ...projection } }
-  );
-  return user;
+
+  const pipeline = [
+    { $match: { userId } },
+
+    // Lookup bookings
+    {
+      $lookup: {
+        from: "bookings",
+        let: { userIdVar: "$userId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$userId", "$$userIdVar"] },
+                  { $in: ["$bookingStatus", ["CONFIRMED", "COMPLETED"]] },
+                ],
+              },
+            },
+          },
+        ],
+        as: "userBookings",
+      },
+    },
+
+    // Lookup payments
+    {
+      $lookup: {
+        from: "payments",
+        let: { userIdVar: "$userId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$userId", "$$userIdVar"] },
+                  { $eq: ["$status", "SUCCESS"] },
+                ],
+              },
+            },
+          },
+        ],
+        as: "userPayments",
+      },
+    },
+
+    // Compute totals
+    {
+      $addFields: {
+        totalBookings: { $size: "$userBookings" },
+        totalPaymentAmount: {
+          $sum: {
+            $map: {
+              input: "$userPayments",
+              as: "p",
+              in: "$$p.amount",
+            },
+          },
+        },
+      },
+    },
+
+    {
+      $project: {
+        password: 0,
+        _id: 0,
+        ...projection,
+      },
+    },
+  ];
+
+  const result = await col.aggregate(pipeline).toArray();
+  return result.length > 0 ? result[0] : null;
 }

@@ -14,6 +14,7 @@ import {
   calculateLateDeliveryCharges,
 } from "./booking.service.ts";
 import { sendError, sendSuccess } from "../../utils/response.ts";
+import { releaseMultipleVehicles } from "../bike/bike.service.ts";
 
 export const createBookingOrder = async (req: Request, res: Response) => {
   try {
@@ -220,13 +221,20 @@ export const healthCheck = async (req: Request, res: Response) => {
 export const completeBookingById = async (req: Request, res: Response) => {
   try {
     const { bookingId, currentDate } = req.body;
-    const result = await calculateLateDeliveryCharges(bookingId, currentDate);
+    const dataObj = new Date(currentDate);
+    const result = await calculateLateDeliveryCharges(bookingId, dataObj);
     if (result === null) {
       sendError(res, 404, "Booking  not found");
       return;
     }
-    if (result === true) {
-      sendSuccess(res, "Booking  completed no late delivery charge available");
+    const Releaseresult = await releaseMultipleVehicles(
+      result.vehicles,
+      0,
+      result.userId,
+      "RENTED"
+    );
+    if (Releaseresult.success === false) {
+      sendError(res, 500, "error in releasing vehicles");
       return;
     }
     sendSuccess(res, result, "Booking completed successfully");

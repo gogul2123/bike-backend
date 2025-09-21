@@ -39,6 +39,8 @@ export async function createBikeService(
       data.imageFile,
       publicId
     );
+
+    console.log("upload result:", uploadResult);
     imageUrl = uploadResult.secure_url;
   }
 
@@ -49,7 +51,7 @@ export async function createBikeService(
     bikeId: generateNumericEpochId("BIKE"),
     modelInfo: {
       ...validatedData.modelInfo,
-      imageUrl: imageUrl || validatedData.modelInfo.imageUrl,
+      imageUrl: imageUrl,
     },
     pricing: validatedData.pricing,
     vehicles: validatedData.vehicles.map((vehicle) => ({
@@ -439,11 +441,83 @@ export async function removeVehicleService(
 
 // Availability Services
 
+// export async function checkAvailabilityService(
+//   query: AvailabilityQueryInputType
+// ): Promise<Bike[]> {
+//   const validatedQuery = AvailabilityQueryInput.parse(query);
+//   const bikeCollection = await getCollection("bikes");
+
+//   const matchStage: any = {
+//     isActive: true,
+//     "counters.available": { $gte: validatedQuery.minVehicles },
+//   };
+
+//   if (validatedQuery.category)
+//     matchStage["modelInfo.category"] = validatedQuery.category;
+//   if (validatedQuery.transmission)
+//     matchStage["modelInfo.transmission"] = validatedQuery.transmission;
+//   if (validatedQuery.brand)
+//     matchStage["modelInfo.brand"] = validatedQuery.brand;
+//   if (validatedQuery.location)
+//     matchStage["vehicles.location"] = validatedQuery.location;
+
+//   // Calculate weekend pricing for the query period
+//   const isWeekendPeriod = [validatedQuery.fromDate, validatedQuery.toDate].some(
+//     (date) => {
+//       const dayOfWeek = date.getUTCDay();
+//       return dayOfWeek === 0 || dayOfWeek === 6;
+//     }
+//   );
+
+//   const pipeline: any[] = [
+//     { $match: matchStage },
+//     {
+//       $addFields: {
+//         effectivePrice: {
+//           $cond: [
+//             isWeekendPeriod,
+//             { $multiply: ["$pricing.basePrice", "$pricing.weekendMultiplier"] },
+//             "$pricing.basePrice",
+//           ],
+//         },
+//       },
+//     },
+//   ];
+
+//   // Apply price filters
+//   if (
+//     validatedQuery.minPrice !== undefined ||
+//     validatedQuery.maxPrice !== undefined
+//   ) {
+//     const priceMatch: any = {};
+//     if (validatedQuery.minPrice !== undefined) {
+//       priceMatch.effectivePrice = { $gte: validatedQuery.minPrice };
+//     }
+//     if (validatedQuery.maxPrice !== undefined) {
+//       priceMatch.effectivePrice = {
+//         ...priceMatch.effectivePrice,
+//         $lte: validatedQuery.maxPrice,
+//       };
+//     }
+//     pipeline.push({ $match: priceMatch });
+//   }
+
+//   pipeline.push({ $sort: { effectivePrice: 1 } }, { $project: { _id: 0 } });
+
+//   const availableBikes = await bikeCollection.aggregate(pipeline).toArray();
+//   return availableBikes as Bike[];
+// }
+
 export async function checkAvailabilityService(
   query: AvailabilityQueryInputType
-): Promise<Bike[]> {
+) {
   const validatedQuery = AvailabilityQueryInput.parse(query);
   const bikeCollection = await getCollection("bikes");
+  const bookingCollection = await getCollection("bookings");
+
+  // Add 1 hour buffer to toDate for late returns
+  const adjustedToDate = new Date(validatedQuery.toDate);
+  adjustedToDate.setHours(adjustedToDate.getHours() + 1);
 
   const matchStage: any = {
     isActive: true,
@@ -500,10 +574,113 @@ export async function checkAvailabilityService(
     pipeline.push({ $match: priceMatch });
   }
 
-  pipeline.push({ $sort: { effectivePrice: 1 } }, { $project: { _id: 0 } });
+  // Count total documents before pagination
+  const countPipeline = [...pipeline, { $count: "total" }];
+  const countResult = await bikeCollection.aggregate(countPipeline).toArray();
+  const totalBeforeFiltering =
+    countResult.length > 0 ? countResult[0].total : 0;
+
+  // Add sorting and pagination
+  pipeline.push(
+    { $sort: { effectivePrice: 1 } },
+    { $skip: (validatedQuery.page - 1) * validatedQuery.limit },
+    { $limit: validatedQuery.limit },
+    { $project: { _id: 0 } }
+  );
 
   const availableBikes = await bikeCollection.aggregate(pipeline).toArray();
-  return availableBikes as Bike[];
+
+  // Find conflicting bookings for the requested date range
+  const conflictingBookings = await bookingCollection
+    .find({
+      bookingStatus: { $in: ["CONFIRMED", "ONGOING"] }, // Only active bookings
+      $or: [
+        // Booking starts within the requested period
+        {
+          fromDate: {
+            $gte: validatedQuery.fromDate,
+            $lt: adjustedToDate,
+          },
+        },
+        // Booking ends within the requested period
+        {
+          toDate: {
+            $gt: validatedQuery.fromDate,
+            $lte: adjustedToDate,
+          },
+        },
+        // Booking completely encompasses the requested period
+        {
+          fromDate: { $lte: validatedQuery.fromDate },
+          toDate: { $gte: adjustedToDate },
+        },
+      ],
+    })
+    .toArray();
+
+  // Extract booked vehicle numbers
+  const bookedVehicleNumbers = new Set<string>();
+  conflictingBookings.forEach((booking) => {
+    booking.vehicles.forEach((vehicle: any) => {
+      bookedVehicleNumbers.add(vehicle.vehicleNumber);
+    });
+  });
+
+  // Filter out booked vehicles from available bikes
+  const filteredBikes = availableBikes
+    .map((bike: any) => {
+      const availableVehicles = bike.vehicles
+        .filter(
+          (vehicle: any) => !bookedVehicleNumbers.has(vehicle.vehicleNumber)
+        )
+        .map((vehicle: any) => ({
+          vehicleId: vehicle.vehicleId,
+          vehicleNumber: vehicle.vehicleNumber,
+        }));
+
+      // Update counters based on filtered vehicles
+      const updatedCounters = {
+        available: availableVehicles.length,
+        total: bike.counters.total,
+      };
+
+      return {
+        bikeId: bike.bikeId,
+        modelInfo: {
+          brand: bike.modelInfo.brand,
+          model: bike.modelInfo.model,
+          imageUrl: bike.modelInfo.imageUrl,
+          transmission: bike.modelInfo.transmission,
+        },
+        vehicles: availableVehicles,
+        counters: updatedCounters,
+        price: bike.effectivePrice,
+      };
+    })
+    .filter(
+      (bike: any) =>
+        // Only return bikes that have at least the minimum required vehicles available
+        bike.counters.available >= validatedQuery.minVehicles
+    );
+
+  // Calculate pagination metadata
+  const totalAfterFiltering = filteredBikes.length;
+  const totalPages = Math.ceil(totalBeforeFiltering / validatedQuery.limit);
+  const hasNextPage = validatedQuery.page < totalPages;
+  const hasPreviousPage = validatedQuery.page > 1;
+
+  return {
+    data: filteredBikes,
+    pagination: {
+      currentPage: validatedQuery.page,
+      limit: validatedQuery.limit,
+      totalDocuments: totalBeforeFiltering,
+      totalPages,
+      hasNextPage,
+      hasPreviousPage,
+      totalFiltered: totalAfterFiltering,
+    },
+  };
 }
 
 export async function getVehiclesByStatusService(
@@ -595,6 +772,92 @@ export async function holdBike(
   return result.modifiedCount > 0;
 }
 
+// export async function holdMultipleVehicles(
+//   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
+//   holdDurationMs: number,
+//   userId?: string | null
+// ): Promise<{
+//   success: boolean;
+//   failedVehicles: Array<{
+//     bikeId: string;
+//     vehicleNumber: string;
+//     error: string;
+//   }>;
+// }> {
+//   const bikeCollection = await getCollection("bikes");
+//   const holdExpiryTime = new Date(Date.now() + holdDurationMs);
+//   const currentDate = new Date();
+
+//   const failedVehicles: Array<{
+//     bikeId: string;
+//     vehicleNumber: string;
+//     error: string;
+//   }> = [];
+
+//   try {
+//     // Group by bikeId for more efficient updates
+//     const vehiclesByBikeId = vehicles.reduce((acc, vehicle) => {
+//       if (!acc[vehicle.bikeId]) {
+//         acc[vehicle.bikeId] = [];
+//       }
+//       acc[vehicle.bikeId].push(vehicle.vehicleNumber);
+//       return acc;
+//     }, {} as Record<string, string[]>);
+
+//     // Update each bike with multiple vehicles in one operation
+//     for (const [bikeId, vehicleNumbers] of Object.entries(vehiclesByBikeId)) {
+//       const result = await bikeCollection.updateOne(
+//         {
+//           bikeId,
+//           "vehicles.vehicleNumber": { $in: vehicleNumbers },
+//           "vehicles.status": "AVAILABLE",
+//         },
+//         {
+//           $set: {
+//             "vehicles.$[elem].status": "HOLDING",
+//             "vehicles.$[elem].metadata.holdExpiryTime": holdExpiryTime,
+//             "vehicles.$[elem].metadata.holdedBy": userId,
+//             "vehicles.$[elem].metadata.lastUpdated": currentDate,
+//             updatedAt: currentDate,
+//           },
+//         },
+//         {
+//           arrayFilters: [
+//             {
+//               "elem.vehicleNumber": { $in: vehicleNumbers },
+//               "elem.status": "AVAILABLE",
+//             },
+//           ],
+//         }
+//       );
+
+//       // Check if update was successful
+//       if (result.modifiedCount === 0) {
+//         vehicleNumbers.forEach((vehicleNumber) => {
+//           failedVehicles.push({
+//             bikeId,
+//             vehicleNumber,
+//             error: "Vehicle not available or update failed",
+//           });
+//         });
+//       }
+//     }
+//   } catch (error) {
+//     vehicles.forEach((vehicle) => {
+//       failedVehicles.push({
+//         bikeId: vehicle.bikeId,
+//         vehicleNumber: vehicle.vehicleNumber,
+//         error: "Database operation failed",
+//       });
+//     });
+//   }
+
+//   return {
+//     success: failedVehicles.length === 0,
+//     failedVehicles,
+//   };
+// }
+
 export async function holdMultipleVehicles(
   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
   holdDurationMs: number,
@@ -627,31 +890,165 @@ export async function holdMultipleVehicles(
       return acc;
     }, {} as Record<string, string[]>);
 
-    // Update each bike with multiple vehicles in one operation
+    // Update each bike with multiple vehicles and counters in one operation
     for (const [bikeId, vehicleNumbers] of Object.entries(vehiclesByBikeId)) {
+      // First, get the current bike document to check vehicle availability
+      const bikeDoc = await bikeCollection.findOne({
+        bikeId,
+        "vehicles.vehicleNumber": { $in: vehicleNumbers },
+        "vehicles.status": "AVAILABLE",
+      });
+
+      if (!bikeDoc) {
+        vehicleNumbers.forEach((vehicleNumber) => {
+          failedVehicles.push({
+            bikeId,
+            vehicleNumber,
+            error: "Vehicle not found or not available",
+          });
+        });
+        continue;
+      }
+
+      // Count how many vehicles will be updated (only available ones)
+      const availableVehicles = bikeDoc.vehicles.filter(
+        (vehicle: any) =>
+          vehicleNumbers.includes(vehicle.vehicleNumber) &&
+          vehicle.status === "AVAILABLE"
+      );
+
+      if (availableVehicles.length === 0) {
+        vehicleNumbers.forEach((vehicleNumber) => {
+          failedVehicles.push({
+            bikeId,
+            vehicleNumber,
+            error: "No available vehicles to hold",
+          });
+        });
+        continue;
+      }
+
+      // Update vehicles and counters in a single operation
       const result = await bikeCollection.updateOne(
         {
           bikeId,
-          "vehicles.vehicleNumber": { $in: vehicleNumbers },
-          "vehicles.status": "AVAILABLE",
         },
-        {
-          $set: {
-            "vehicles.$[elem].status": "HOLDING",
-            "vehicles.$[elem].metadata.holdExpiryTime": holdExpiryTime,
-            "vehicles.$[elem].metadata.holdedBy": userId,
-            "vehicles.$[elem].metadata.lastUpdated": currentDate,
-            updatedAt: currentDate,
-          },
-        },
-        {
-          arrayFilters: [
-            {
-              "elem.vehicleNumber": { $in: vehicleNumbers },
-              "elem.status": "AVAILABLE",
+        [
+          {
+            $set: {
+              // Update vehicles array
+              vehicles: {
+                $map: {
+                  input: "$vehicles",
+                  as: "vehicle",
+                  in: {
+                    $cond: {
+                      if: {
+                        $and: [
+                          { $in: ["$$vehicle.vehicleNumber", vehicleNumbers] },
+                          { $eq: ["$$vehicle.status", "AVAILABLE"] },
+                        ],
+                      },
+                      then: {
+                        $mergeObjects: [
+                          "$$vehicle",
+                          {
+                            status: "HOLDING",
+                            metadata: {
+                              $mergeObjects: [
+                                "$$vehicle.metadata",
+                                {
+                                  holdExpiryTime: holdExpiryTime,
+                                  holdedBy: userId,
+                                  lastUpdated: currentDate,
+                                },
+                              ],
+                            },
+                          },
+                        ],
+                      },
+                      else: "$$vehicle",
+                    },
+                  },
+                },
+              },
+              // Update counters dynamically
+              counters: {
+                $let: {
+                  vars: {
+                    updatedVehicles: {
+                      $map: {
+                        input: "$vehicles",
+                        as: "vehicle",
+                        in: {
+                          $cond: {
+                            if: {
+                              $and: [
+                                {
+                                  $in: [
+                                    "$$vehicle.vehicleNumber",
+                                    vehicleNumbers,
+                                  ],
+                                },
+                                { $eq: ["$$vehicle.status", "AVAILABLE"] },
+                              ],
+                            },
+                            then: "HOLDING",
+                            else: "$$vehicle.status",
+                          },
+                        },
+                      },
+                    },
+                  },
+                  in: {
+                    total: "$counters.total",
+                    available: {
+                      $size: {
+                        $filter: {
+                          input: "$$updatedVehicles",
+                          cond: { $eq: ["$$this", "AVAILABLE"] },
+                        },
+                      },
+                    },
+                    holding: {
+                      $size: {
+                        $filter: {
+                          input: "$$updatedVehicles",
+                          cond: { $eq: ["$$this", "HOLDING"] },
+                        },
+                      },
+                    },
+                    rented: {
+                      $size: {
+                        $filter: {
+                          input: "$$updatedVehicles",
+                          cond: { $eq: ["$$this", "RENTED"] },
+                        },
+                      },
+                    },
+                    maintenance: {
+                      $size: {
+                        $filter: {
+                          input: "$$updatedVehicles",
+                          cond: { $eq: ["$$this", "MAINTENANCE"] },
+                        },
+                      },
+                    },
+                    inactive: {
+                      $size: {
+                        $filter: {
+                          input: "$$updatedVehicles",
+                          cond: { $eq: ["$$this", "INACTIVE"] },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              updatedAt: currentDate,
             },
-          ],
-        }
+          },
+        ]
       );
 
       // Check if update was successful
@@ -660,12 +1057,30 @@ export async function holdMultipleVehicles(
           failedVehicles.push({
             bikeId,
             vehicleNumber,
-            error: "Vehicle not available or update failed",
+            error: "Vehicle update failed",
           });
         });
+      } else {
+        // Check which vehicles actually failed (not available)
+        const updatedDoc = await bikeCollection.findOne({ bikeId });
+        if (updatedDoc) {
+          vehicleNumbers.forEach((vehicleNumber) => {
+            const vehicle = updatedDoc.vehicles.find(
+              (v: any) => v.vehicleNumber === vehicleNumber
+            );
+            if (!vehicle || vehicle.status !== "HOLDING") {
+              failedVehicles.push({
+                bikeId,
+                vehicleNumber,
+                error: "Vehicle was not available for holding",
+              });
+            }
+          });
+        }
       }
     }
   } catch (error) {
+    console.error("Database operation failed:", error);
     vehicles.forEach((vehicle) => {
       failedVehicles.push({
         bikeId: vehicle.bikeId,
@@ -681,6 +1096,93 @@ export async function holdMultipleVehicles(
   };
 }
 
+// export async function bookMultipleVehicles(
+//   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
+//   holdDurationMs: number,
+//   userId?: string | null
+// ): Promise<{
+//   success: boolean;
+//   failedVehicles: Array<{
+//     bikeId: string;
+//     vehicleNumber: string;
+//     error: string;
+//   }>;
+// }> {
+//   const bikeCollection = await getCollection("bikes");
+//   const holdExpiryTime = new Date(Date.now() + holdDurationMs);
+//   const currentDate = new Date();
+
+//   const failedVehicles: Array<{
+//     bikeId: string;
+//     vehicleNumber: string;
+//     error: string;
+//   }> = [];
+
+//   try {
+//     // Group by bikeId for more efficient updates
+//     const vehiclesByBikeId = vehicles.reduce((acc, vehicle) => {
+//       if (!acc[vehicle.bikeId]) {
+//         acc[vehicle.bikeId] = [];
+//       }
+//       acc[vehicle.bikeId].push(vehicle.vehicleNumber);
+//       return acc;
+//     }, {} as Record<string, string[]>);
+
+//     // Update each bike with multiple vehicles in one operation
+//     for (const [bikeId, vehicleNumbers] of Object.entries(vehiclesByBikeId)) {
+//       const result = await bikeCollection.updateOne(
+//         {
+//           bikeId,
+//           "vehicles.vehicleNumber": { $in: vehicleNumbers },
+//           "vehicles.status": "HOLDING",
+//           "vehicles.metadata.holdedBy": userId,
+//         },
+//         {
+//           $set: {
+//             "vehicles.$[elem].status": "RENTED",
+//             "vehicles.$[elem].metadata.holdExpiryTime": holdExpiryTime,
+//             "vehicles.$[elem].metadata.lastUpdated": currentDate,
+//             updatedAt: currentDate,
+//           },
+//         },
+//         {
+//           arrayFilters: [
+//             {
+//               "elem.vehicleNumber": { $in: vehicleNumbers },
+//               "elem.status": "HOLDING",
+//               "elem.metadata.holdedBy": userId,
+//             },
+//           ],
+//         }
+//       );
+
+//       // Check if update was successful
+//       if (result.modifiedCount === 0) {
+//         vehicleNumbers.forEach((vehicleNumber) => {
+//           failedVehicles.push({
+//             bikeId,
+//             vehicleNumber,
+//             error: "Vehicle not available or update failed",
+//           });
+//         });
+//       }
+//     }
+//   } catch (error) {
+//     vehicles.forEach((vehicle) => {
+//       failedVehicles.push({
+//         bikeId: vehicle.bikeId,
+//         vehicleNumber: vehicle.vehicleNumber,
+//         error: "Database operation failed",
+//       });
+//     });
+//   }
+
+//   return {
+//     success: failedVehicles.length === 0,
+//     failedVehicles,
+//   };
+// }
+
 export async function bookMultipleVehicles(
   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
   holdDurationMs: number,
@@ -694,7 +1196,6 @@ export async function bookMultipleVehicles(
   }>;
 }> {
   const bikeCollection = await getCollection("bikes");
-  const holdExpiryTime = new Date(Date.now() + holdDurationMs);
   const currentDate = new Date();
 
   const failedVehicles: Array<{
@@ -713,33 +1214,229 @@ export async function bookMultipleVehicles(
       return acc;
     }, {} as Record<string, string[]>);
 
-    // Update each bike with multiple vehicles in one operation
+    // Update each bike with multiple vehicles and counters in one operation
     for (const [bikeId, vehicleNumbers] of Object.entries(vehiclesByBikeId)) {
-      const result = await bikeCollection.updateOne(
-        {
-          bikeId,
-          "vehicles.vehicleNumber": { $in: vehicleNumbers },
-          "vehicles.status": "HOLDING",
-          "vehicles.metadata.holdedBy": userId,
-        },
+      // First, get the current bike document to check vehicle availability
+      const bikeDoc = await bikeCollection.findOne({
+        bikeId,
+        "vehicles.vehicleNumber": { $in: vehicleNumbers },
+        "vehicles.status": "HOLDING",
+        "vehicles.metadata.holdedBy": userId,
+      });
+
+      if (!bikeDoc) {
+        vehicleNumbers.forEach((vehicleNumber) => {
+          failedVehicles.push({
+            bikeId,
+            vehicleNumber,
+            error: "Vehicle not found, not on hold, or not held by this user",
+          });
+        });
+        continue;
+      }
+
+      // Count how many vehicles will be updated (only held ones by this user)
+      const heldVehicles = bikeDoc.vehicles.filter(
+        (vehicle: any) =>
+          vehicleNumbers.includes(vehicle.vehicleNumber) &&
+          vehicle.status === "HOLDING" &&
+          vehicle.metadata?.holdedBy === userId
+      );
+
+      if (heldVehicles.length === 0) {
+        vehicleNumbers.forEach((vehicleNumber) => {
+          failedVehicles.push({
+            bikeId,
+            vehicleNumber,
+            error: "No held vehicles to book for this user",
+          });
+        });
+        continue;
+      }
+
+      // Update vehicles and counters in a single operation
+      const result = await bikeCollection.updateOne({ bikeId }, [
         {
           $set: {
-            "vehicles.$[elem].status": "RENTED",
-            "vehicles.$[elem].metadata.holdExpiryTime": holdExpiryTime,
-            "vehicles.$[elem].metadata.lastUpdated": currentDate,
+            // Update vehicles array
+            vehicles: {
+              $map: {
+                input: "$vehicles",
+                as: "vehicle",
+                in: {
+                  $cond: {
+                    if: {
+                      $and: [
+                        { $in: ["$$vehicle.vehicleNumber", vehicleNumbers] },
+                        { $eq: ["$$vehicle.status", "HOLDING"] },
+                        { $eq: ["$$vehicle.metadata.holdedBy", userId] },
+                      ],
+                    },
+                    then: {
+                      $mergeObjects: [
+                        "$$vehicle",
+                        {
+                          status: "AVAILABLE",
+                          metadata: {
+                            $mergeObjects: [
+                              {
+                                $unsetField: {
+                                  field: "holdExpiryTime",
+                                  input: "$$vehicle.metadata",
+                                },
+                              },
+                              {
+                                $unsetField: {
+                                  field: "holdedBy",
+                                  input: {
+                                    $unsetField: {
+                                      field: "holdExpiryTime",
+                                      input: "$$vehicle.metadata",
+                                    },
+                                  },
+                                },
+                              },
+                              {
+                                lastUpdated: currentDate,
+                              },
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                    else: "$$vehicle",
+                  },
+                },
+              },
+            },
+            // Update counters and isActive status dynamically
+            counters: {
+              $let: {
+                vars: {
+                  updatedVehicles: {
+                    $map: {
+                      input: "$vehicles",
+                      as: "vehicle",
+                      in: {
+                        $cond: {
+                          if: {
+                            $and: [
+                              {
+                                $in: [
+                                  "$$vehicle.vehicleNumber",
+                                  vehicleNumbers,
+                                ],
+                              },
+                              { $eq: ["$$vehicle.status", "HOLDING"] },
+                              { $eq: ["$$vehicle.metadata.holdedBy", userId] },
+                            ],
+                          },
+                          then: "AVAILABLE",
+                          else: "$$vehicle.status",
+                        },
+                      },
+                    },
+                  },
+                },
+                in: {
+                  total: "$counters.total",
+                  available: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "AVAILABLE"] },
+                      },
+                    },
+                  },
+                  holding: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "HOLDING"] },
+                      },
+                    },
+                  },
+                  rented: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "RENTED"] },
+                      },
+                    },
+                  },
+                  maintenance: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "MAINTENANCE"] },
+                      },
+                    },
+                  },
+                  inactive: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "INACTIVE"] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            // Set isActive to false if all vehicles are rented
+            isActive: {
+              $let: {
+                vars: {
+                  updatedVehicles: {
+                    $map: {
+                      input: "$vehicles",
+                      as: "vehicle",
+                      in: {
+                        $cond: {
+                          if: {
+                            $and: [
+                              {
+                                $in: [
+                                  "$$vehicle.vehicleNumber",
+                                  vehicleNumbers,
+                                ],
+                              },
+                              { $eq: ["$$vehicle.status", "HOLDING"] },
+                              { $eq: ["$$vehicle.metadata.holdedBy", userId] },
+                            ],
+                          },
+                          then: "RENTED",
+                          else: "$$vehicle.status",
+                        },
+                      },
+                    },
+                  },
+                },
+                in: {
+                  $cond: {
+                    if: {
+                      $gt: [
+                        {
+                          $size: {
+                            $filter: {
+                              input: "$$updatedVehicles",
+                              cond: { $eq: ["$$this", "AVAILABLE"] },
+                            },
+                          },
+                        },
+                        0,
+                      ],
+                    },
+                    then: true,
+                    else: false,
+                  },
+                },
+              },
+            },
             updatedAt: currentDate,
           },
         },
-        {
-          arrayFilters: [
-            {
-              "elem.vehicleNumber": { $in: vehicleNumbers },
-              "elem.status": "HOLDING",
-              "elem.metadata.holdedBy": userId,
-            },
-          ],
-        }
-      );
+      ]);
 
       // Check if update was successful
       if (result.modifiedCount === 0) {
@@ -747,12 +1444,30 @@ export async function bookMultipleVehicles(
           failedVehicles.push({
             bikeId,
             vehicleNumber,
-            error: "Vehicle not available or update failed",
+            error: "Vehicle booking failed",
           });
         });
+      } else {
+        // Verify which vehicles were actually booked
+        const updatedDoc = await bikeCollection.findOne({ bikeId });
+        if (updatedDoc) {
+          vehicleNumbers.forEach((vehicleNumber) => {
+            const vehicle = updatedDoc.vehicles.find(
+              (v: any) => v.vehicleNumber === vehicleNumber
+            );
+            if (!vehicle || vehicle.status !== "RENTED") {
+              failedVehicles.push({
+                bikeId,
+                vehicleNumber,
+                error: "Vehicle was not available for booking",
+              });
+            }
+          });
+        }
       }
     }
   } catch (error) {
+    console.error("Database operation failed:", error);
     vehicles.forEach((vehicle) => {
       failedVehicles.push({
         bikeId: vehicle.bikeId,
@@ -862,10 +1577,101 @@ export async function releaseBike(
   return result.modifiedCount > 0;
 }
 
+// export async function releaseMultipleVehicles(
+//   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
+//   holdDurationMs: number,
+//   userId?: string | null
+// ): Promise<{
+//   success: boolean;
+//   failedVehicles: Array<{
+//     bikeId: string;
+//     vehicleNumber: string;
+//     error: string;
+//   }>;
+// }> {
+//   const bikeCollection = await getCollection("bikes");
+//   const holdExpiryTime = new Date(Date.now() + holdDurationMs);
+//   const currentDate = new Date();
+
+//   const failedVehicles: Array<{
+//     bikeId: string;
+//     vehicleNumber: string;
+//     error: string;
+//   }> = [];
+
+//   try {
+//     // Group by bikeId for more efficient updates
+//     const vehiclesByBikeId = vehicles.reduce((acc, vehicle) => {
+//       if (!acc[vehicle.bikeId]) {
+//         acc[vehicle.bikeId] = [];
+//       }
+//       acc[vehicle.bikeId].push(vehicle.vehicleNumber);
+//       return acc;
+//     }, {} as Record<string, string[]>);
+
+//     // Update each bike with multiple vehicles in one operation
+//     for (const [bikeId, vehicleNumbers] of Object.entries(vehiclesByBikeId)) {
+//       const result = await bikeCollection.updateOne(
+//         {
+//           bikeId,
+//           "vehicles.vehicleNumber": { $in: vehicleNumbers },
+//           "vehicles.status": "HOLDING",
+//           "vehicles.metadata.holdedBy": userId,
+//         },
+//         {
+//           $set: {
+//             "vehicles.$[elem].status": "AVAILABLE",
+//             "vehicles.$[elem].metadata.lastUpdated": currentDate,
+//             updatedAt: currentDate,
+//           },
+//           $unset: {
+//             "vehicles.$[elem].metadata.holdExpiryTime": "",
+//             "vehicles.$[elem].metadata.holdedBy": "",
+//           },
+//         },
+//         {
+//           arrayFilters: [
+//             {
+//               "elem.vehicleNumber": { $in: vehicleNumbers },
+//               "elem.status": "HOLDING",
+//               "elem.metadata.holdedBy": userId,
+//             },
+//           ],
+//         }
+//       );
+
+//       // Check if update was successful
+//       if (result.modifiedCount === 0) {
+//         vehicleNumbers.forEach((vehicleNumber) => {
+//           failedVehicles.push({
+//             bikeId,
+//             vehicleNumber,
+//             error: "Vehicle not available or update failed",
+//           });
+//         });
+//       }
+//     }
+//   } catch (error) {
+//     vehicles.forEach((vehicle) => {
+//       failedVehicles.push({
+//         bikeId: vehicle.bikeId,
+//         vehicleNumber: vehicle.vehicleNumber,
+//         error: "Database operation failed",
+//       });
+//     });
+//   }
+
+//   return {
+//     success: failedVehicles.length === 0,
+//     failedVehicles,
+//   };
+// }
+
 export async function releaseMultipleVehicles(
   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
   holdDurationMs: number,
-  userId?: string | null
+  userId?: string | null,
+  fromStatus: string = "HOLDING"
 ): Promise<{
   success: boolean;
   failedVehicles: Array<{
@@ -875,7 +1681,6 @@ export async function releaseMultipleVehicles(
   }>;
 }> {
   const bikeCollection = await getCollection("bikes");
-  const holdExpiryTime = new Date(Date.now() + holdDurationMs);
   const currentDate = new Date();
 
   const failedVehicles: Array<{
@@ -894,36 +1699,231 @@ export async function releaseMultipleVehicles(
       return acc;
     }, {} as Record<string, string[]>);
 
-    // Update each bike with multiple vehicles in one operation
+    console.log(vehiclesByBikeId, "vehicle  array data format");
+
+    // Update each bike with multiple vehicles and counters in one operation
     for (const [bikeId, vehicleNumbers] of Object.entries(vehiclesByBikeId)) {
-      const result = await bikeCollection.updateOne(
-        {
-          bikeId,
-          "vehicles.vehicleNumber": { $in: vehicleNumbers },
-          "vehicles.status": "HOLDING",
-          "vehicles.metadata.holdedBy": userId,
-        },
+      // First, get the current bike document to check vehicle status
+      const bikeDoc = await bikeCollection.findOne({
+        bikeId,
+        "vehicles.vehicleNumber": { $in: vehicleNumbers },
+        "vehicles.status": fromStatus,
+        "vehicles.metadata.holdedBy": userId,
+      });
+
+      if (!bikeDoc) {
+        vehicleNumbers.forEach((vehicleNumber) => {
+          failedVehicles.push({
+            bikeId,
+            vehicleNumber,
+            error: `Vehicle not found, not in ${fromStatus} status, or not held by this user`,
+          });
+        });
+        continue;
+      }
+
+      // Count how many vehicles will be released (only vehicles with the specified status by this user)
+      const targetStatusVehicles = bikeDoc.vehicles.filter(
+        (vehicle: any) =>
+          vehicleNumbers.includes(vehicle.vehicleNumber) &&
+          vehicle.status === fromStatus &&
+          vehicle.metadata?.holdedBy === userId
+      );
+
+      if (targetStatusVehicles.length === 0) {
+        vehicleNumbers.forEach((vehicleNumber) => {
+          failedVehicles.push({
+            bikeId,
+            vehicleNumber,
+            error: `No vehicles in ${fromStatus} status to release for this user`,
+          });
+        });
+        continue;
+      }
+
+      // Update vehicles and counters in a single operation
+      const result = await bikeCollection.updateOne({ bikeId }, [
         {
           $set: {
-            "vehicles.$[elem].status": "AVAILABLE",
-            "vehicles.$[elem].metadata.lastUpdated": currentDate,
+            // Update vehicles array
+            vehicles: {
+              $map: {
+                input: "$vehicles",
+                as: "vehicle",
+                in: {
+                  $cond: {
+                    if: {
+                      $and: [
+                        { $in: ["$$vehicle.vehicleNumber", vehicleNumbers] },
+                        { $eq: ["$$vehicle.status", fromStatus] },
+                        { $eq: ["$$vehicle.metadata.holdedBy", userId] },
+                      ],
+                    },
+                    then: {
+                      $mergeObjects: [
+                        "$$vehicle",
+                        {
+                          status: "AVAILABLE",
+                          metadata: {
+                            $mergeObjects: [
+                              {
+                                $unsetField: {
+                                  field: "holdExpiryTime",
+                                  input: "$$vehicle.metadata",
+                                },
+                              },
+                              {
+                                $unsetField: {
+                                  field: "holdedBy",
+                                  input: {
+                                    $unsetField: {
+                                      field: "holdExpiryTime",
+                                      input: "$$vehicle.metadata",
+                                    },
+                                  },
+                                },
+                              },
+                              {
+                                lastUpdated: currentDate,
+                              },
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                    else: "$$vehicle",
+                  },
+                },
+              },
+            },
+            // Update counters dynamically
+            counters: {
+              $let: {
+                vars: {
+                  updatedVehicles: {
+                    $map: {
+                      input: "$vehicles",
+                      as: "vehicle",
+                      in: {
+                        $cond: {
+                          if: {
+                            $and: [
+                              {
+                                $in: [
+                                  "$$vehicle.vehicleNumber",
+                                  vehicleNumbers,
+                                ],
+                              },
+                              { $eq: ["$$vehicle.status", fromStatus] },
+                              { $eq: ["$$vehicle.metadata.holdedBy", userId] },
+                            ],
+                          },
+                          then: "AVAILABLE",
+                          else: "$$vehicle.status",
+                        },
+                      },
+                    },
+                  },
+                },
+                in: {
+                  total: "$counters.total",
+                  available: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "AVAILABLE"] },
+                      },
+                    },
+                  },
+                  holding: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "HOLDING"] },
+                      },
+                    },
+                  },
+                  rented: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "RENTED"] },
+                      },
+                    },
+                  },
+                  maintenance: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "MAINTENANCE"] },
+                      },
+                    },
+                  },
+                  inactive: {
+                    $size: {
+                      $filter: {
+                        input: "$$updatedVehicles",
+                        cond: { $eq: ["$$this", "INACTIVE"] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            // Restore isActive to true since vehicles are now available
+            isActive: {
+              $let: {
+                vars: {
+                  updatedVehicles: {
+                    $map: {
+                      input: "$vehicles",
+                      as: "vehicle",
+                      in: {
+                        $cond: {
+                          if: {
+                            $and: [
+                              {
+                                $in: [
+                                  "$$vehicle.vehicleNumber",
+                                  vehicleNumbers,
+                                ],
+                              },
+                              { $eq: ["$$vehicle.status", fromStatus] },
+                              { $eq: ["$$vehicle.metadata.holdedBy", userId] },
+                            ],
+                          },
+                          then: "AVAILABLE",
+                          else: "$$vehicle.status",
+                        },
+                      },
+                    },
+                  },
+                },
+                in: {
+                  $cond: {
+                    if: {
+                      $gt: [
+                        {
+                          $size: {
+                            $filter: {
+                              input: "$$updatedVehicles",
+                              cond: { $eq: ["$$this", "AVAILABLE"] },
+                            },
+                          },
+                        },
+                        0,
+                      ],
+                    },
+                    then: true,
+                    else: "$isActive", // Keep current value if still no available vehicles
+                  },
+                },
+              },
+            },
             updatedAt: currentDate,
           },
-          $unset: {
-            "vehicles.$[elem].metadata.holdExpiryTime": "",
-            "vehicles.$[elem].metadata.holdedBy": "",
-          },
         },
-        {
-          arrayFilters: [
-            {
-              "elem.vehicleNumber": { $in: vehicleNumbers },
-              "elem.status": "HOLDING",
-              "elem.metadata.holdedBy": userId,
-            },
-          ],
-        }
-      );
+      ]);
 
       // Check if update was successful
       if (result.modifiedCount === 0) {
@@ -931,12 +1931,31 @@ export async function releaseMultipleVehicles(
           failedVehicles.push({
             bikeId,
             vehicleNumber,
-            error: "Vehicle not available or update failed",
+            error: "Vehicle release failed",
           });
         });
       }
+      // else {
+      //   // Verify which vehicles were actually updated
+      //   const updatedDoc = await bikeCollection.findOne({ bikeId });
+      //   if (updatedDoc) {
+      //     vehicleNumbers.forEach((vehicleNumber) => {
+      //       const vehicle = updatedDoc.vehicles.find(
+      //         (v:any) => v.vehicleNumber === vehicleNumber
+      //       );
+      //       if (!vehicle || vehicle.status !== "AVAILABLE") {
+      //         failedVehicles.push({
+      //           bikeId,
+      //           vehicleNumber,
+      //           error: `Vehicle was not successfully changed from ${fromStatus} to AVAILABLE`,
+      //         });
+      //       }
+      //     });
+      //   }
+      // }
     }
   } catch (error) {
+    console.error("Database operation failed:", error);
     vehicles.forEach((vehicle) => {
       failedVehicles.push({
         bikeId: vehicle.bikeId,

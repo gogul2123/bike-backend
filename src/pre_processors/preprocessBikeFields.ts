@@ -204,20 +204,6 @@ export function preprocessBikeFields(
       req.body.imageFile = req.file;
     }
 
-    // Debug log the processed body structure
-    console.log(
-      "Processed body structure:",
-      JSON.stringify(
-        req.body,
-        (key, value) => {
-          if (value instanceof Date) return value.toISOString();
-          if (value instanceof Buffer) return "[Buffer]";
-          return value;
-        },
-        2
-      )
-    );
-
     next();
   } catch (err) {
     console.error("Preprocessing error:", err);

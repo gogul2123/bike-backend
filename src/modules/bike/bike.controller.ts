@@ -21,7 +21,7 @@ export const createBikeHandler = async (req: Request, res: Response) => {
     });
     sendSuccess(res, result, "Bike created successfully");
   } catch (err: any) {
-    console.error("Error creating bike:", err);
+    console.log("Error creating bike:", err);
     sendError(res, err.statusCode || 500, err.message);
   }
 };
@@ -170,7 +170,9 @@ export const checkAvailabilityHandler = async (req: Request, res: Response) => {
       transmission,
       brand,
       minVehicles = "1",
-    } = req.query;
+      page = 1,
+      limit = 10,
+    } = req.body;
 
     const query = {
       fromDate: fromDate ? new Date(fromDate as string) : new Date(),
@@ -182,6 +184,8 @@ export const checkAvailabilityHandler = async (req: Request, res: Response) => {
       transmission: transmission as "gear" | "automatic",
       brand: brand as string,
       minVehicles: parseInt(minVehicles as string),
+      page: page,
+      limit: limit,
     };
 
     const result = await checkAvailabilityService(query);
