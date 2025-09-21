@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { updateInitialDataSchemaZ, updateUserSchemaZ, getUser } from "./user.model.ts";
-import { UpdateInitialData, updateUserHandler, getUserHandler } from "./user.controller.ts";
+import { UpdateInitialData, updateUserHandler, getUserHandler, getAllUsersHandler } from "./user.controller.ts";
 import { validateZod } from "../../middlewares/validate.ts";
 
 const router = Router();
@@ -14,6 +14,8 @@ router.post(
 );
 
 router.post("/get-user", validateZod(getUser), getUserHandler);
+
+router.get("/get-all-users", getAllUsersHandler);
 
 
 export default router;
