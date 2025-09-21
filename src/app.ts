@@ -12,11 +12,13 @@ import paymentRoute from "./modules/payment/payment.route.ts";
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
-app.use(cors({
-  origin: "*",  // or "http://localhost:3000" for Next.js
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+app.use(
+  cors({
+    origin: "*", // or "http://localhost:3000" for Next.js
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoute);
