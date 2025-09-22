@@ -6,6 +6,7 @@ import {
   updateUserInitialData,
 } from "./user.service.ts";
 import { generateToken } from "../../utils/jwt.ts";
+import { getBookingsAndRecommendations } from "../../services/dashboard.ts";
 
 export const updateUserHandler = async (req: Request, res: Response) => {
   try {
@@ -59,6 +60,21 @@ export const getUserHandler = async (req: Request, res: Response) => {
     sendSuccess(res, user, "User retrieved successfully");
   } catch (error) {
     console.error("Error retrieving user:", error);
+    sendError(res, 500, "Internal server error");
+  }
+};
+
+export const dashboardHandler = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    console.log("userId", userId);
+    if (!userId) {
+      sendError(res, 401, "Unauthorized");
+      return;
+    }
+    const dashboardData = await getBookingsAndRecommendations(userId, 3);
+    sendSuccess(res, dashboardData, "Dashboard data retrieved successfully");
+  } catch (error) {
     sendError(res, 500, "Internal server error");
   }
 };
