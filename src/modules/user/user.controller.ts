@@ -4,6 +4,7 @@ import {
   getUserByID,
   updateUser,
   updateUserInitialData,
+  getAllUsers,
 } from "./user.service.ts";
 import { generateToken } from "../../utils/jwt.ts";
 import { getBookingsAndRecommendations } from "../../services/dashboard.ts";
@@ -75,6 +76,19 @@ export const dashboardHandler = async (req: Request, res: Response) => {
     const dashboardData = await getBookingsAndRecommendations(userId, 3);
     sendSuccess(res, dashboardData, "Dashboard data retrieved successfully");
   } catch (error) {
+    sendError(res, 500, "Internal server error");
+  }
+};
+
+export const getAllUsersHandler = async (req: Request, res: Response) => {
+  console.log("Get all users request received");
+  try {
+    const users = await getAllUsers();
+    const userCount = users.length;
+    const result = { userCount, users };
+    sendSuccess(res, result, "Users retrieved successfully");
+  } catch (error) {
+    console.error("Error retrieving users:", error);
     sendError(res, 500, "Internal server error");
   }
 };

@@ -8,6 +8,7 @@ import {
   UpdateInitialData,
   updateUserHandler,
   getUserHandler,
+  getAllUsersHandler,
   dashboardHandler,
 } from "./user.controller.ts";
 import { validateZod } from "../../middlewares/validate.ts";
@@ -23,6 +24,8 @@ router.post(
 );
 
 router.post("/get-user", validateZod(getUser), getUserHandler);
+
+router.get("/get-all-users", getAllUsersHandler);
 
 router.get("/dashboard/:userId", dashboardHandler);
 

@@ -218,3 +218,9 @@ export async function getUserByID(
   const result = await col.aggregate(pipeline).toArray();
   return result.length > 0 ? result[0] : null;
 }
+
+export async function getAllUsers(): Promise<any[]> {
+  const col = await getCollection("users");
+  const users = await col.find({}).toArray();
+  return users;
+}
