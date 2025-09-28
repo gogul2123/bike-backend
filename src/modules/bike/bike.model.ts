@@ -53,10 +53,10 @@ export const ModelInfoSchema = z.object({
   specifications: z
     .object({
       engine: z.string().optional(),
-      mileage: z.string().optional(),
-      fuelType: z.string().optional(),
-      weight: z.string().optional(),
-      topSpeed: z.string().optional(),
+      mileage: z.union([z.string(), z.number()]).optional(),
+      fuelType: z.union([z.string(), z.number()]).optional(),
+      weight: z.union([z.string(), z.number()]).optional(),
+      topSpeed: z.union([z.string(), z.number()]).optional(),
     })
     .optional(),
 });

@@ -188,7 +188,7 @@ export async function getBikesService(filters: {
   const total = result.totalCount[0]?.count || 0;
 
   return {
-    data: bikes,
+    bikes,
     total,
     page,
     limit,

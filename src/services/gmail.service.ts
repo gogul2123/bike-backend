@@ -105,6 +105,8 @@ import nodemailer from "nodemailer";
 import ejs from "ejs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { ContactInput } from "../modules/contact/contact.model.ts";
+import { success } from "zod";
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -155,31 +157,23 @@ export const sendOTPMail = async (
 };
 
 // Alternative function if you want to keep the original structure
-export const sendMail = async (
-  recipientEmail: string,
-  userData: Record<string, any>
-) => {
+export const sendMail = async (recipientEmail: string, message: string) => {
   try {
     const templatePath = path.join(__dirname, "../views/email.ejs");
 
-    const templateData = {
-      userName: userData.name || "Rider",
-      otp: userData.otp || "123456",
-      expiryTime: userData.expiryTime || "10 minutes",
-    };
+    // const htmlContent = await ejs.renderFile(templatePath, templateData);
 
-    const htmlContent = await ejs.renderFile(templatePath, templateData);
+    // const mailOptions = {
+    //   from: process.env.APP_EMAIL,
+    //   to: recipientEmail,
+    //   subject: "Indian Bikes - OTP Verification",
+    //   html: htmlContent,
+    // };
 
-    const mailOptions = {
-      from: process.env.APP_EMAIL,
-      to: recipientEmail,
-      subject: "Indian Bikes - OTP Verification",
-      html: htmlContent,
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully");
+    // await transporter.sendMail(mailOptions);
+    // console.log("Email sent successfully");
+    return { success: true, message: "Email sent successfully" };
   } catch (error) {
-    console.log("Error:", error);
+    return { success: false, error: (error as Error).message };
   }
 };

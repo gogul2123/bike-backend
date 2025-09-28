@@ -111,23 +111,23 @@ export async function getAllPayments(
   const match: Filter<Payment> = {};
 
   // Build basic filter conditions
-  if (filter.userId) match.userId = filter.userId;
-  if (filter.status) match.status = filter.status;
+  if (filter?.userId) match.userId = filter.userId;
+  if (filter?.status) match.status = filter.status;
 
   // Date range filter
-  if (filter.fromDate || filter.toDate) {
+  if (filter?.fromDate || filter.toDate) {
     match.createdAt = {};
-    if (filter.fromDate) match.createdAt.$gte = filter.fromDate;
-    if (filter.toDate) match.createdAt.$lte = filter.toDate;
+    if (filter?.fromDate) match.createdAt.$gte = filter?.fromDate;
+    if (filter?.toDate) match.createdAt.$lte = filter?.toDate;
   }
 
   // Search filter
-  if (filter.search) {
-    const searchRegex = new RegExp(filter.search, "i"); // case-insensitive
+  if (filter?.search) {
+    const searchRegex = new RegExp(filter?.search, "i"); // case-insensitive
     match.$or = [
       { paymentId: searchRegex },
       { bookingId: searchRegex },
-      { amount: { $eq: Number(filter.search) } }, // match exact amount if numeric
+      { amount: { $eq: Number(filter?.search) } }, // match exact amount if numeric
     ];
   }
 

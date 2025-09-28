@@ -57,7 +57,7 @@ export const getBikesHandler = async (req: Request, res: Response) => {
       maxPrice,
       location,
       isActive,
-    } = req.query;
+    } = req.body;
 
     const filters = {
       page: parseInt(page as string),
