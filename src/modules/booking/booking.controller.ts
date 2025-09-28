@@ -20,8 +20,6 @@ export const createBookingOrder = async (req: Request, res: Response) => {
   try {
     const bookingData = req.body;
 
-    console.log("Received booking data:", bookingData);
-
     const result = await createBookingOrderService(bookingData);
 
     sendSuccess(res, result, "Booking order created successfully");
@@ -110,12 +108,32 @@ export const getBookings = async (req: Request, res: Response) => {
 export const getUserBookings = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const { page = "1", limit = "10" } = req.query;
+    const { page = "1", limit = "10", search = "" } = req.query;
 
-    const result = await getUserBookingsService(
-      userId,
-      parseInt(page as string),
-      parseInt(limit as string)
+    // Ensure 'search' is a string or undefined
+    const searchStr = typeof search === "string" ? search : undefined;
+
+    console.log("params", req.query);
+    const result = await getBookingsService(
+      {
+        userId,
+        search: searchStr as string,
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+      },
+      {
+        _id: 0,
+        bookingId: 1,
+        userId: 1,
+        "vehicles.bikeId": 1,
+        "vehicles.vehicleNumber": 1,
+        "vehicles.modelName": 1,
+        "vehicles.brand": 1,
+        fromDate: 1,
+        toDate: 1,
+        "pricing.totalAmount": 1,
+        bookingStatus: 1,
+      }
     );
 
     sendSuccess(res, result, "User bookings retrieved successfully");

@@ -293,16 +293,12 @@ export async function createBookingOrderService(
   // Create booking vehicles with denormalized data
   const bookingVehicles = await createBookingVehicles(validatedData.vehicles);
 
-  console.log("validated Data--->", validatedData);
-
   // Calculate pricing breakdown
   const pricingBreakdown = await calculatePricingBreakdown(
     validatedData.vehicles,
     validatedData.fromDate,
     validatedData.toDate
   );
-
-  console.log("Pricing Breakdown:", pricingBreakdown);
 
   // Hold all vehicles
 
@@ -366,6 +362,7 @@ export async function createBookingOrderService(
       isMultiModel: uniqueModels.size > 1,
       customerNotes: validatedData.customerNotes,
     },
+    emergencyContact: validatedData.emergencyContact,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -383,7 +380,7 @@ export async function createBookingOrderService(
       amount: validatedBooking.pricing.totalAmount,
       razorpay_order_id: order.id,
       razorpay_payment_id: "",
-      status: "pending",
+      status: "PENDING",
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -437,7 +434,7 @@ export async function completeBookingPaymentService(
         },
       }
     );
-
+    await updatePayment(bookingId, "FAILED", razorpay_payment_id);
     return { success: false, error: "Payment verification failed" };
   } else {
     try {
@@ -453,10 +450,6 @@ export async function completeBookingPaymentService(
         { bookingId },
         {
           $set: {
-            "payment.status": "SUCCESS",
-            "payment.paymentId": razorpay_payment_id,
-            "payment.razorpayPaymentId": razorpay_payment_id,
-            "payment.transactionDate": new Date(),
             bookingStatus: "CONFIRMED",
             updatedAt: new Date(),
           },
@@ -479,12 +472,12 @@ export async function completeBookingPaymentService(
           { bookingId },
           {
             $set: {
-              "payment.status": "FAILED",
               bookingStatus: "CANCELLED",
               updatedAt: new Date(),
             },
           }
         );
+        await updatePayment(bookingId, "FAILED", razorpay_payment_id);
         return {
           success: false,
           error: `Payment capture failed: ${error.message}`,
@@ -560,13 +553,6 @@ export async function cancelBookingService(
     booking.userId as Booking["userId"]
   );
 
-  // Process refund if payment was successful
-  // let refundAmount = 0;
-  // if (payment.status === "SUCCESS" && validatedData.refundAmount) {
-  //   refundAmount = validatedData.refundAmount;
-  //   // You can implement actual refund logic here with Razorpay
-  // }
-
   // Update booking
   const updatedBooking = await bookingCollection.findOneAndUpdate(
     { bookingId: validatedData.bookingId },
@@ -578,6 +564,9 @@ export async function cancelBookingService(
     },
     { returnDocument: "after" }
   );
+
+  await updatePayment(validatedData.bookingId, "FAILED", "");
+
   return updatedBooking.value as Booking;
 }
 
@@ -607,6 +596,7 @@ export async function getBookingsService(
     toDate,
     bikeId,
     vehicleNumber,
+    search,
   } = validatedFilters;
 
   const matchStage: any = {};
@@ -626,8 +616,21 @@ export async function getBookingsService(
     }
   }
 
+  if (search) {
+    matchStage.$or = [
+      { bookingId: { $regex: search, $options: "i" } }, // search by bookingId
+      { "vehicles.brand": { $regex: search, $options: "i" } }, // search by brand
+      { "vehicles.modelName": { $regex: search, $options: "i" } }, // search by model
+    ];
+  }
+
   const pipeline = [
-    { $match: matchStage },
+    {
+      $match: {
+        bookingStatus: { $in: ["CONFIRMED", "COMPLETED"] },
+        ...matchStage,
+      },
+    },
     {
       $facet: {
         data: [
@@ -636,31 +639,115 @@ export async function getBookingsService(
           { $limit: limit },
           { $project: { _id: 0, ...projection } },
         ],
-        totalCount: [{ $count: "count" }],
+        statusCounts: [
+          {
+            $group: {
+              _id: "$bookingStatus",
+              count: { $sum: 1 },
+            },
+          },
+        ],
+        // <-- SUM using pricing.totalAmount instead of payment.totalAmount
+        totalAmountCalc: [
+          {
+            $group: {
+              _id: null,
+              totalAmount: { $sum: { $ifNull: ["$pricing.totalAmount", 0] } },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        totalActiveBookings: {
+          $ifNull: [
+            {
+              $getField: {
+                field: "count",
+                input: {
+                  $first: {
+                    $filter: {
+                      input: "$statusCounts",
+                      as: "s",
+                      cond: { $eq: ["$$s._id", "CONFIRMED"] },
+                    },
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        totalCompletedBookings: {
+          $ifNull: [
+            {
+              $getField: {
+                field: "count",
+                input: {
+                  $first: {
+                    $filter: {
+                      input: "$statusCounts",
+                      as: "s",
+                      cond: { $eq: ["$$s._id", "COMPLETED"] },
+                    },
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // robustly extract the aggregated totalAmount (or 0 if missing)
+        totalAmount: {
+          $let: {
+            vars: {
+              arr: { $ifNull: ["$totalAmountCalc.totalAmount", []] }, // array like [123]
+            },
+            in: { $ifNull: [{ $arrayElemAt: ["$$arr", 0] }, 0] },
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        totalCount: {
+          $add: ["$totalActiveBookings", "$totalCompletedBookings"],
+        },
+      },
+    },
+    {
+      $project: {
+        data: 1,
+        totalActiveBookings: 1,
+        totalCompletedBookings: 1,
+        totalCount: 1,
+        totalAmount: 1,
       },
     },
   ];
 
   const [result] = await bookingCollection.aggregate(pipeline).toArray();
 
-  const bookings = result.data || [];
-  const total = result.totalCount[0]?.count || 0;
+  console.log("result", result);
 
   return {
-    data: bookings,
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
+    bookings: result.data || [],
+    total: result.totalCount || 0,
+    totalActiveBookings: result.totalActiveBookings || 0,
+    totalCompletedBookings: result.totalCompletedBookings || 0,
+    totalAmount: result.totalAmount || 0,
+    totalPages: Math.ceil(result.totalCount / limit),
   };
 }
 
 export async function getUserBookingsService(
   userId: string,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  projection?: any
 ) {
-  return getBookingsService({ userId, page, limit });
+  return getBookingsService({ userId, page, limit }, projection);
 }
 
 export async function getBookingsByStatusService(

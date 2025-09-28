@@ -42,48 +42,135 @@ export async function getPaymentByBookingId(
   )) as Payment | null;
 }
 
+// export async function getAllPayments(
+//   filter: PaymentFilterInput
+// ): Promise<{ payments: Payment[]; total: number }> {
+//   const col = await getCollection("payments");
+//   const match: Filter<Payment> = {};
+
+//   // Build filter conditions
+//   if (filter.userId) match.userId = filter.userId;
+//   if (filter.status) match.status = filter.status;
+//   if (filter.bookingId) match.bookingId = filter.bookingId;
+//   if (filter.paymentId) match.paymentId = filter.paymentId;
+
+//   // Date range filter
+//   if (filter.fromDate || filter.toDate) {
+//     match.createdAt = {}; // Initialize createdAt as an empty object
+//     if (filter.fromDate) match.createdAt.$gte = filter.fromDate;
+//     if (filter.toDate) match.createdAt.$lte = filter.toDate;
+//   }
+
+//   const pipeline = [
+//     { $match: match },
+//     { $sort: { createdAt: -1 } },
+//     {
+//       $facet: {
+//         payments: [
+//           { $skip: ((filter.page as number) - 1) * (filter.limit as number) },
+//           { $limit: filter.limit },
+//           {
+//             $project: {
+//               _id: 0,
+//               createdAt: 0,
+//               updatedAt: 0,
+//               razorpay_order_id: 0,
+//               razorpay_payment_id:0,
+//             },
+//           },
+//         ],
+//         totalCount: [{ $count: "count" }],
+//         totalCaptured: [
+//           { $match: { status: "SUCCESS" } },
+//           { $group: { _id: null, total: { $sum: "$amount" } } },
+//         ],
+//       },
+//     },
+//     {
+//       $project: {
+//         payments: 1,
+//         total: { $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0] },
+//         capturedAmount: {
+//           $ifNull: [{ $arrayElemAt: ["$totalCaptured.total", 0] }, 0],
+//         },
+//       },
+//     },
+//   ];
+
+//   const result = await col.aggregate(pipeline).toArray();
+
+//   console.log("result", result);
+//   const { payments = [], total = 0 } = result[0] || {};
+//   return { payments, total };
+// }
+
 export async function getAllPayments(
   filter: PaymentFilterInput
-): Promise<{ payments: Payment[]; total: number }> {
+): Promise<{ payments: Payment[]; total: number; capturedAmount: number }> {
   const col = await getCollection("payments");
   const match: Filter<Payment> = {};
 
-  // Build filter conditions
+  // Build basic filter conditions
   if (filter.userId) match.userId = filter.userId;
   if (filter.status) match.status = filter.status;
-  if (filter.bookingId) match.bookingId = filter.bookingId;
-  if (filter.paymentId) match.paymentId = filter.paymentId;
 
   // Date range filter
   if (filter.fromDate || filter.toDate) {
-    match.createdAt = {}; // Initialize createdAt as an empty object
+    match.createdAt = {};
     if (filter.fromDate) match.createdAt.$gte = filter.fromDate;
     if (filter.toDate) match.createdAt.$lte = filter.toDate;
   }
 
+  // Search filter
+  if (filter.search) {
+    const searchRegex = new RegExp(filter.search, "i"); // case-insensitive
+    match.$or = [
+      { paymentId: searchRegex },
+      { bookingId: searchRegex },
+      { amount: { $eq: Number(filter.search) } }, // match exact amount if numeric
+    ];
+  }
+
   const pipeline = [
     { $match: match },
-    { $sort: { "createdAt.$date": -1 } },
+    { $sort: { createdAt: -1 } },
     {
       $facet: {
-        items: [
+        payments: [
           { $skip: ((filter.page as number) - 1) * (filter.limit as number) },
           { $limit: filter.limit },
+          {
+            $project: {
+              _id: 0,
+              createdAt: 0,
+              updatedAt: 0,
+              razorpay_order_id: 0,
+              razorpay_payment_id: 0,
+            },
+          },
         ],
         totalCount: [{ $count: "count" }],
+        totalCaptured: [
+          { $match: { status: "SUCCESS" } },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ],
       },
     },
     {
       $project: {
-        data: "$items",
-        total: { $arrayElemAt: ["$totalCount.count", 0] },
+        payments: 1,
+        total: { $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0] },
+        capturedAmount: {
+          $ifNull: [{ $arrayElemAt: ["$totalCaptured.total", 0] }, 0],
+        },
       },
     },
   ];
 
   const result = await col.aggregate(pipeline).toArray();
-  const { payments = [], total = 0 } = result[0] || {};
-  return { payments, total };
+  console.log("result", result);
+  const { payments = [], total = 0, capturedAmount = 0 } = result[0] || {};
+  return { payments, total, capturedAmount };
 }
 
 export const updatePaymentStatus = async (

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const paymentStatus = ["PENDING", "SUCCESS", "FAILED", "REFUNDED"];
+const paymentStatus = ["PENDING", "SUCCESS", "FAILED", "REFUNDED", "CANCELLED"];
 
 export const createPaymentSchemaZ = z.object({
   userId: z.string(),
@@ -60,6 +60,7 @@ export const paymentFilterInputSchemaZ = z.object({
   paymentId: z.string().optional(),
   page: z.number().optional(),
   limit: z.number().optional(),
+  search: z.string().optional(),
 });
 
 export type Payment = z.infer<typeof paymentSchemaZ>;

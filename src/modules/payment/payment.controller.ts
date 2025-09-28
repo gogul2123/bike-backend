@@ -45,7 +45,8 @@ export const getAllPaymentsHandler = async (req: Request, res: Response) => {
       toDate,
       page = 1,
       limit = 10,
-    } = req.query as PaymentFilterInput;
+      search = "",
+    } = req.body as PaymentFilterInput;
     const filter = {
       userId,
       status,
@@ -53,13 +54,14 @@ export const getAllPaymentsHandler = async (req: Request, res: Response) => {
       toDate,
       limit: limit,
       page: page,
+      search,
     };
-    const { total, payments } = await getAllPayments(filter);
+    const { total, payments, capturedAmount } = await getAllPayments(filter);
     if (!payments) {
       sendError(res, 404, "No payments found");
       return;
     }
-    sendSuccess(res, { total, payments });
+    sendSuccess(res, { total, payments, capturedAmount });
   } catch (err) {
     console.error(err);
     sendError(res, 500, "Failed to fetch payments");

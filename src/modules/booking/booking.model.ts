@@ -75,7 +75,6 @@ export const BookingSchema = z
         insuranceIncluded: z.boolean().default(false),
         deliveryRequired: z.boolean().default(false),
         deliveryAddress: z.string().optional(),
-        emergencyContact: z.string().optional(),
       })
       .optional(),
     metadata: z
@@ -93,6 +92,12 @@ export const BookingSchema = z
     updatedAt: z
       .preprocess((v) => new Date(v as string), z.date())
       .default(() => new Date()),
+    emergencyContact: z
+      .string()
+      .optional()
+      .refine((val) => !val || /^\d{10}$/.test(val), {
+        message: "Phone number must be exactly 10 digits",
+      }),
   })
   .refine((data) => data.toDate.getTime() > data.fromDate.getTime(), {
     message: "toDate must be after fromDate",
@@ -166,10 +171,15 @@ export const CreateBookingInput = z
         insuranceIncluded: z.boolean().default(false),
         deliveryRequired: z.boolean().default(false),
         deliveryAddress: z.string().optional(),
-        emergencyContact: z.string().optional(),
       })
       .optional(),
     customerNotes: z.string().optional(),
+    emergencyContact: z
+      .string()
+      .optional()
+      .refine((val) => !val || /^\d{10}$/.test(val), {
+        message: "Phone number must be exactly 10 digits",
+      }),
   })
   .refine((data) => data.toDate.getTime() > data.fromDate.getTime(), {
     message: "toDate must be after fromDate",
@@ -214,6 +224,7 @@ export const CancelBookingInput = z.object({
 
 export const BookingQueryInput = z.object({
   userId: z.string().optional(),
+  search: z.string().optional(),
   status: z.enum(bookingStatus).optional(),
   fromDate: z.preprocess(
     (v) => (v ? new Date(v as string) : undefined),
