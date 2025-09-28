@@ -67,12 +67,49 @@ export const getUserHandler = async (req: Request, res: Response) => {
 export const getAllUsersHandler = async (req: Request, res: Response) => {
   console.log("Get all users request received");
   try {
+    const { page, limit } = req.body;
     const users = await getAllUsers();
     const userCount = users.length;
-    const result = { userCount, users };
+    const activeUserCount = users.filter(user => user.status === "active").length;
+    const inactiveUserCount = users.filter(user => user.status === "inactive").length;
+    const result = { userCount, activeUserCount, inactiveUserCount, users };
     sendSuccess(res, result, "Users retrieved successfully");
   } catch (error) {
     console.error("Error retrieving users:", error);
     sendError(res, 500, "Internal server error");
   }
 };
+
+export const searchUsersHandler = async (req: Request, res: Response) => {
+  try {
+    const { query, status } = req.body;
+    const users = await getAllUsers();
+
+    // normalize values
+    const q = (query || "").toLowerCase();
+    const s = (status || "").toLowerCase();
+
+    const filteredUsers = users.filter(user => {
+      const matchesQuery =
+        !q ||
+        user.name?.toLowerCase().includes(q) ||
+        user.email?.toLowerCase().includes(q) ||
+        user.mobile?.includes(q);
+
+      const matchesStatus =
+        !s || user.status.toLowerCase() === s;
+
+      return matchesQuery && matchesStatus;
+    });
+
+    if (filteredUsers.length === 0) {
+      return sendError(res, 404, "User not found");
+    }
+
+    return sendSuccess(res, filteredUsers, "Users retrieved successfully");
+  } catch (error) {
+    console.error("Error searching users:", error);
+    return sendError(res, 500, "Internal server error");
+  }
+};
+
