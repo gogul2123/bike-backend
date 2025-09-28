@@ -2,6 +2,7 @@
 import express, { RequestHandler } from "express";
 import helmet from "helmet";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 const app = express();
 import authRoutes from "./modules/auth/otp.routes.ts";
 import userRoute from "./modules/user/user.route.ts";
@@ -12,11 +13,13 @@ import paymentRoute from "./modules/payment/payment.route.ts";
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
+app.use(cookieParser());
 app.use(
   cors({
-    origin: "*", // or "http://localhost:3000" for Next.js
+    origin: "http://localhost:3000", // or "http://localhost:3000" for Next.js
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   })
 );
 
@@ -26,7 +29,7 @@ app.use("/api/bike", bikeRoute);
 app.use("/api/booking", bookingRoute);
 app.use("/api/payment", paymentRoute);
 
-app.post("/health", (req, res) => {
+app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 

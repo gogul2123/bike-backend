@@ -1,6 +1,19 @@
 import { Router } from "express";
-import { updateInitialDataSchemaZ, updateUserSchemaZ, getUser, searchUUsers, getAllUser } from "./user.model.ts";
-import { UpdateInitialData, updateUserHandler, getUserHandler, getAllUsersHandler, searchUsersHandler } from "./user.controller.ts";
+import {
+  updateInitialDataSchemaZ,
+  updateUserSchemaZ,
+  getUser,
+  getAllUser,
+  searchUUsers,
+} from "./user.model.ts";
+import {
+  UpdateInitialData,
+  updateUserHandler,
+  getUserHandler,
+  getAllUsersHandler,
+  dashboardHandler,
+  searchUsersHandler,
+} from "./user.controller.ts";
 import { validateZod } from "../../middlewares/validate.ts";
 
 const router = Router();
@@ -19,5 +32,6 @@ router.post("/get-all-users", validateZod(getAllUser), getAllUsersHandler);
 
 router.post("/search-users", validateZod(searchUUsers), searchUsersHandler);
 
+router.get("/dashboard/:userId", dashboardHandler);
 
 export default router;
