@@ -73,8 +73,8 @@ router.post(
   addVehicleHandler
 );
 
-router.patch(
-  "/updateVehicleStatus/:bikeId/vehicles/status",
+router.post(
+  "/updateVehicleStatus/:bikeId/updateVehicle",
   validateZod(UpdateVehicleStatusInput),
   updateVehicleStatusHandler
 );

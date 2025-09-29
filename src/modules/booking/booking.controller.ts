@@ -15,6 +15,7 @@ import {
 } from "./booking.service.ts";
 import { sendError, sendSuccess } from "../../utils/response.ts";
 import { releaseMultipleVehicles } from "../bike/bike.service.ts";
+import { BookingQueryInputType } from "./booking.model.ts";
 
 export const createBookingOrder = async (req: Request, res: Response) => {
   try {
@@ -256,6 +257,35 @@ export const completeBookingById = async (req: Request, res: Response) => {
       return;
     }
     sendSuccess(res, result, "Booking completed successfully");
+  } catch (err: any) {
+    sendError(res, 500, err.message);
+    return;
+  }
+};
+
+export const getALLBookingsForAdmin = async (req: Request, res: Response) => {
+  try {
+    const filters = req.body as BookingQueryInputType;
+
+    const result = await getBookingsService(filters, {
+      _id: 0,
+      bookingId: 1,
+      "vehicles.bikeId": 1,
+      "vehicles.vehicleNumber": 1,
+      "vehicles.modelName": 1,
+      "vehicles.brand": 1,
+      fromDate: 1,
+      toDate: 1,
+      "pricing.totalAmount": 1,
+      bookingStatus: 1,
+    });
+
+    if (!result) {
+      sendError(res, 404, "Bookings not found");
+      return;
+    }
+
+    sendSuccess(res, result, "Bookings retrieved successfully");
   } catch (err: any) {
     sendError(res, 500, err.message);
     return;
