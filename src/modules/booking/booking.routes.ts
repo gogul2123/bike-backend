@@ -15,6 +15,7 @@ import {
   completeBookings,
   healthCheck,
   completeBookingById,
+  getALLBookingsForAdmin,
 } from "./booking.controller.ts";
 import {
   BookingById,
@@ -48,6 +49,13 @@ router.get(
   validateZod(getUserBookingsSchema),
   getUserBookings
 );
+
+router.post(
+  "/getAdminBookings",
+  validateZod(BookingQueryInput),
+  getALLBookingsForAdmin
+);
+
 router.get(
   "/getBookingStatus/:status",
   validateZod(getBookingsByStatusSchema),
@@ -58,7 +66,7 @@ router.post(
   validateZod(completeBookingSchema),
   verifyPayment
 );
-router.put("/updateBooking", validateZod(UpdateBookingInput), updateBooking);
+router.post("/updateBooking", validateZod(UpdateBookingInput), updateBooking);
 router.post("/cancelBooking", validateZod(CancelBookingInput), cancelBooking);
 
 // Admin routes
