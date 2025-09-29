@@ -28,7 +28,7 @@ export const ContactSchema = contactInput.extend({
   contactId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
-  status: z.string(),
+  status: z.enum(["PENDING", "RESOLVED"]),
   reply: z.string().optional(),
 });
 

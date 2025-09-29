@@ -26,7 +26,7 @@ export const contactHandler = async (req: Request, res: Response) => {
       subject,
       message,
       phone,
-      status: "ACTIVE",
+      status: "PENDING",
       createdAt: new Date(),
       updatedAt: new Date(),
     } as Contact);
@@ -44,7 +44,7 @@ export const contactHandler = async (req: Request, res: Response) => {
 
 export const getContactHandler = async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 10, status = "ALL" } = req.query;
+    const { page = 1, limit = 10, status = "ALL" } = req.body;
     const contactCol = await getCollection("contact");
     const matchStage: any = {};
 
@@ -57,7 +57,7 @@ export const getContactHandler = async (req: Request, res: Response) => {
       { $sort: { createdAt: -1 } },
       {
         $facet: {
-          data: [
+          contacts: [
             {
               $skip: (parseInt(page as string) - 1) * parseInt(limit as string),
             },
@@ -65,6 +65,7 @@ export const getContactHandler = async (req: Request, res: Response) => {
             {
               $project: {
                 _id: 0,
+                updatedAt: 0,
               },
             },
           ],
@@ -73,7 +74,7 @@ export const getContactHandler = async (req: Request, res: Response) => {
       },
       {
         $project: {
-          data: 1,
+          contacts: 1,
           total: { $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0] },
           totalPages: {
             $ceil: {
@@ -88,8 +89,14 @@ export const getContactHandler = async (req: Request, res: Response) => {
     ];
 
     const result = await contactCol.aggregate(pipeline).toArray();
-    return result[0];
-  } catch (error) {}
+    if (!result) {
+      sendError(res, 404, "No contacts found");
+      return;
+    }
+    sendSuccess(res, result[0]);
+  } catch (error) {
+    sendError(res, 500, "Internal server error");
+  }
 };
 
 export const replyContactHandler = async (req: Request, res: Response) => {
@@ -103,7 +110,7 @@ export const replyContactHandler = async (req: Request, res: Response) => {
       { _id: contactId },
       {
         $set: {
-          status: "REPLIED",
+          status: "RESOLVED" as Contact["status"],
           reply: message,
           updatedAt: new Date(),
         },

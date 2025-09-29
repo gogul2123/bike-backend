@@ -17,7 +17,7 @@ import {
 const router = Router();
 
 router.post("/contact", validateZod(contactInput), contactHandler);
-router.get("/getContacts", validateZod(getContact), getContactHandler);
+router.post("/getContacts", validateZod(getContact), getContactHandler);
 router.post("/contact/reply", validateZod(replyContact), replyContactHandler);
 router.get(
   "/contact/:contactId",
