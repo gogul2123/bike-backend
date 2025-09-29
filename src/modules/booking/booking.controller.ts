@@ -12,6 +12,7 @@ import {
   activateBookingsService,
   completeBookingsService,
   calculateLateDeliveryCharges,
+  completeBookingWithPayment,
 } from "./booking.service.ts";
 import { sendError, sendSuccess } from "../../utils/response.ts";
 import { releaseMultipleVehicles } from "../bike/bike.service.ts";
@@ -20,9 +21,7 @@ import { BookingQueryInputType } from "./booking.model.ts";
 export const createBookingOrder = async (req: Request, res: Response) => {
   try {
     const bookingData = req.body;
-
     const result = await createBookingOrderService(bookingData);
-
     sendSuccess(res, result, "Booking order created successfully");
   } catch (err: any) {
     console.error("Error creating booking order:", err);
@@ -237,7 +236,7 @@ export const healthCheck = async (req: Request, res: Response) => {
   }
 };
 
-export const completeBookingById = async (req: Request, res: Response) => {
+export const calculateLateCharge = async (req: Request, res: Response) => {
   try {
     const { bookingId, currentDate } = req.body;
     const dataObj = new Date(currentDate);
@@ -246,14 +245,23 @@ export const completeBookingById = async (req: Request, res: Response) => {
       sendError(res, 404, "Booking  not found");
       return;
     }
-    const Releaseresult = await releaseMultipleVehicles(
-      result.vehicles,
-      0,
-      result.userId,
-      "RENTED"
-    );
-    if (Releaseresult.success === false) {
-      sendError(res, 500, "error in releasing vehicles");
+    sendSuccess(res, result, "Booking completed successfully");
+  } catch (err: any) {
+    sendError(res, 500, err.message);
+    return;
+  }
+};
+
+export const completeBookingById = async (req: Request, res: Response) => {
+  try {
+    const { bookingId, paidAmount } = req.body;
+    const result = await completeBookingWithPayment({
+      bookingId,
+      paidAmount,
+    });
+
+    if (!result) {
+      sendError(res, 404, "Booking not found");
       return;
     }
     sendSuccess(res, result, "Booking completed successfully");

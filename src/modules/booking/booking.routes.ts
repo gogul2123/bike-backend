@@ -16,6 +16,7 @@ import {
   healthCheck,
   completeBookingById,
   getALLBookingsForAdmin,
+  calculateLateCharge,
 } from "./booking.controller.ts";
 import {
   BookingById,
@@ -74,10 +75,23 @@ router.post("/cleanup-holds", cleanupExpiredHolds);
 router.post("/activate-bookings", activateBookings);
 router.post("/completeAllbookings", completeBookings);
 router.get("/getAllBookings", validateZod(BookingQueryInput), getBookings);
+
+router.post(
+  "/calculateLateCharge",
+  validateZod(
+    BookingSchema.pick({ bookingId: true }).extend({
+      currentDate: z.date(),
+    })
+  ),
+  calculateLateCharge
+);
+
 router.post(
   "/completeBookingById",
   validateZod(
-    BookingSchema.pick({ bookingId: true }).extend({ currentDate: z.string() })
+    BookingSchema.pick({ bookingId: true }).extend({
+      paidAmount: z.number().nonnegative(),
+    })
   ),
   completeBookingById
 );

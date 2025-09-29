@@ -5,6 +5,7 @@ import {
   Payment,
   PaymentFilterInput,
 } from "./payment.model.ts";
+import { da } from "zod/locales";
 
 export async function createPayment(
   payment: CreatePaymentInput
@@ -218,16 +219,13 @@ export const savePayment = async (payment: Payment) => {
   await paymentsCol.insertOne(payment);
 };
 
-export const updatePayment = async (
-  bookingId: string,
-  status: Payment["status"],
-  razorpay_payment_id: Payment["razorpay_payment_id"]
-) => {
+export const updatePayment = async (data: Partial<Payment>) => {
   const paymentsCol = await getCollection("payments");
+
   await paymentsCol.updateOne(
     {
-      bookingId: bookingId,
+      bookingId: data.bookingId,
     },
-    { $set: { status, razorpay_payment_id } }
+    { $set: { ...data } }
   );
 };

@@ -11,6 +11,7 @@ import bookingRoute from "./modules/booking/booking.routes.ts";
 import contactRoute from "./modules/contact/contact.route.ts";
 import paymentRoute from "./modules/payment/payment.route.ts";
 import adminRoute from "./modules/admin/dashboad.routes.ts";
+// import uploadRouter from "./modules/fileUpload/upload.route.ts";
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -32,6 +33,7 @@ app.use("/api/booking", bookingRoute);
 app.use("/api/payment", paymentRoute);
 app.use("/api/contact", contactRoute);
 app.use("/api/admin", adminRoute);
+// app.use("/api/image/upload", uploadRouter);
 
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });

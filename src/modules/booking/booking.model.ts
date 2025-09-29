@@ -4,9 +4,17 @@ import { BookingVehicleInput } from "../bike/bike.model.ts";
 const bookingStatus = [
   "INITIATED",
   "CONFIRMED",
-  "ACTIVE",
+  "DELIVERED",
   "COMPLETED",
   "CANCELLED",
+];
+
+const idProof = [
+  "AadharCard",
+  "DrivingLicense",
+  "Passport",
+  "PANCard",
+  "VoterID",
 ];
 
 export const BookingVehicleSchema = z.object({
@@ -35,9 +43,6 @@ export const ItemPricingBreakdownSchema = z.object({
 });
 
 export const PricingBreakdownSchema = z.object({
-  // items: z
-  //   .array(ItemPricingBreakdownSchema)
-  //   .min(1, "At least one item is required"),
   totalBaseAmount: z.number().nonnegative(),
   totalWeekendAmount: z.number().nonnegative(),
   subtotalAmount: z.number().positive(),
@@ -46,6 +51,9 @@ export const PricingBreakdownSchema = z.object({
   totalDays: z.number().positive(),
   totalWeekdayCount: z.number().nonnegative(),
   totalWeekendCount: z.number().nonnegative(),
+  advanceAmount: z.number().nonnegative().default(0),
+  remainingAmount: z.number().positive().default(0),
+  lateChargeAmount: z.number().nonnegative().default(0),
   currency: z.string().default("INR"),
 });
 
@@ -98,6 +106,8 @@ export const BookingSchema = z
       .refine((val) => !val || /^\d{10}$/.test(val), {
         message: "Phone number must be exactly 10 digits",
       }),
+    bookBy: z.enum(["USER", "ADMIN"]).default("USER"),
+    idProof: z.enum(idProof),
   })
   .refine((data) => data.toDate.getTime() > data.fromDate.getTime(), {
     message: "toDate must be after fromDate",
@@ -180,6 +190,8 @@ export const CreateBookingInput = z
       .refine((val) => !val || /^\d{10}$/.test(val), {
         message: "Phone number must be exactly 10 digits",
       }),
+    fullPayment: z.boolean().default(true),
+    idProof: z.enum(idProof),
   })
   .refine((data) => data.toDate.getTime() > data.fromDate.getTime(), {
     message: "toDate must be after fromDate",
@@ -211,11 +223,15 @@ export const UpdateBookingInput = z.object({
       insuranceIncluded: z.boolean().optional(),
       deliveryRequired: z.boolean().optional(),
       deliveryAddress: z.string().optional(),
-      emergencyContact: z.string().optional(),
     })
     .partial()
     .optional(),
-  internalNotes: z.string().optional(),
+  emergencyContact: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^\d{10}$/.test(val), {
+      message: "Phone number must be exactly 10 digits",
+    }),
 });
 
 export const CancelBookingInput = z.object({

@@ -40,7 +40,6 @@ export async function createBikeService(
       publicId
     );
 
-    console.log("upload result:", uploadResult);
     imageUrl = uploadResult.secure_url;
   }
 

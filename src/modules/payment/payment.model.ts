@@ -27,12 +27,15 @@ export const paymentSchemaZ = z.object({
   bookingId: z.string(),
   paymentId: z.string(),
   userId: z.string(),
-  amount: z.number(),
+  paidAmount: z.number().nonnegative(),
+  totalAmount: z.number().nonnegative(),
   razorpay_order_id: z.string(),
   razorpay_payment_id: z.string(),
   status: z.enum(paymentStatus),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
+  advanceAmount: z.number().nonnegative(),
+  remainingAmount: z.number().nonnegative(),
 });
 
 export const createPaymentInputSchemaZ = paymentSchemaZ.omit({
