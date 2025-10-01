@@ -33,7 +33,7 @@ const router = Router();
 // Bike CRUD routes
 router.post(
   "/createBike",
-  authorizeRoles,
+  authorizeRoles(),
   upload.single("imageFile"),
   (req: Request, res: Response, next: NextFunction) => {
     if (!req.file) {
@@ -49,28 +49,28 @@ router.post(
 
 router.get(
   "/getById/:bikeId",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(bikeIdSchema),
   getBikeByIdHandler
 );
 
 router.post(
   "/getAllBikes",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(AvailabilityQueryInput.partial()),
   getBikesHandler
 );
 
 router.delete(
   "/deleteBike/:bikeId",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(bikeIdSchema),
   deleteBikeHandler
 );
 
 router.put(
   "/updateBike/:bikeId",
-  authorizeRoles,
+  authorizeRoles(),
   optionalFileUpload("imageFile"),
   validateZod(UpdateBikeInput),
   preprocessBikeFields,
@@ -80,21 +80,21 @@ router.put(
 // Vehicle management routes
 router.post(
   "/addVehicle/:bikeId/vehicles",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(AddVehicleInput),
   addVehicleHandler
 );
 
 router.post(
   "/updateVehicleStatus/:bikeId/updateVehicle",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(UpdateVehicleStatusInput),
   updateVehicleStatusHandler
 );
 
 router.delete(
   "/:bikeId/vehicles/:vehicleNumber",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(vehicleNumberSchema),
   removeVehicleHandler
 );
@@ -109,7 +109,7 @@ router.post(
 // Vehicle status routes
 router.get(
   "/:bikeId/vehicles",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(statusQuerySchema),
   getVehiclesByStatusHandler
 );

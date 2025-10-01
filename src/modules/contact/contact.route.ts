@@ -20,19 +20,19 @@ const router = Router();
 router.post("/contact", validateZod(contactInput), contactHandler);
 router.post(
   "/getContacts",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(getContact),
   getContactHandler
 );
 router.post(
   "/contact/reply",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(replyContact),
   replyContactHandler
 );
 router.get(
   "/contact/:contactId",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(ContactSchema.pick({ contactId: true })),
   getContactByIdHandler
 );

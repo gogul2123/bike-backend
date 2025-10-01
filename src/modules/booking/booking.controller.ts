@@ -177,13 +177,11 @@ export const updateBooking = async (req: Request, res: Response) => {
 export const cancelBooking = async (req: Request, res: Response) => {
   try {
     const cancelData = req.body;
-
     const cancelledBooking = await cancelBookingService(cancelData);
-
     sendSuccess(res, cancelledBooking, "Booking cancelled successfully");
   } catch (err: any) {
     console.error("Error cancelling booking:", err);
-    sendError(res, 400, err.message);
+    sendError(res, 500, err.message);
   }
 };
 

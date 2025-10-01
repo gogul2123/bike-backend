@@ -7,8 +7,8 @@ const allowedRoles = ["admin"];
 
 export function authorizeRoles() {
   return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user; // comes from authenticateToken
-
+    const user = req.user;
+    console.log("user", user);
     if (envConfig.nodeEnv === "development") {
       next();
       return;

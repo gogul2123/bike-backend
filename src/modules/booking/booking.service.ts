@@ -106,6 +106,83 @@ export const BOOK_HOLD_DURATION = 15 * 60 * 1000; // 15 minutes
 //   };
 // }
 
+// async function calculatePricingBreakdown(
+//   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
+//   fromDate: Date,
+//   toDate: Date,
+//   fullPayment: boolean = false
+// ): Promise<PricingBreakdown> {
+//   // Validate dates
+//   if (fromDate > toDate) {
+//     throw new Error("fromDate cannot be after toDate");
+//   }
+
+//   let advanceAmount = 0,
+//     remainingAmount = 0;
+
+//   // Calculate days as 24-hour periods
+//   const totalDays = calculate24HourDays(fromDate, toDate);
+
+//   // Count weekend and weekday portions within the total days
+//   const { weekendDays, weekdayDays } = calculateWeekendWeekdayDays(
+//     fromDate,
+//     toDate,
+//     totalDays
+//   );
+
+//   // Get all bike details in a single query (no loops)
+//   const bikeIds = vehicles.map((v) => v.bikeId);
+//   const bikes = await getBikesByIds(bikeIds);
+
+//   if (bikes.length !== vehicles.length) {
+//     throw new Error("Some bikes not found");
+//   }
+
+//   // Calculate pricing using functional array methods (no explicit loops)
+//   const pricingCalculations = bikes.map((bike) => {
+//     const basePrice = bike.pricing.basePrice;
+//     const weekendMultiplier = bike.pricing.weekendMultiplier;
+
+//     // Calculate amounts based on day portions
+//     const weekdayAmount = weekdayDays * basePrice;
+//     const weekendAmount = weekendDays * basePrice * weekendMultiplier;
+
+//     return { weekdayAmount, weekendAmount };
+//   });
+
+//   // Sum all amounts using reduce
+//   const { totalBaseAmount, totalWeekendAmount } = pricingCalculations.reduce(
+//     (acc, curr) => ({
+//       totalBaseAmount: acc.totalBaseAmount + curr.weekdayAmount,
+//       totalWeekendAmount: acc.totalWeekendAmount + curr.weekendAmount,
+//     }),
+//     { totalBaseAmount: 0, totalWeekendAmount: 0 }
+//   );
+
+//   const subtotalAmount = totalBaseAmount + totalWeekendAmount;
+//   const totalAmount = subtotalAmount;
+
+//   if (!fullPayment) {
+//     advanceAmount = Math.round(totalAmount * 0.5); // 20% advance
+//     remainingAmount = totalAmount - advanceAmount;
+//   }
+
+//   return {
+//     totalBaseAmount,
+//     totalWeekendAmount,
+//     subtotalAmount,
+//     discountAmount: 0,
+//     totalAmount,
+//     totalDays,
+//     totalWeekdayCount: weekdayDays,
+//     totalWeekendCount: weekendDays,
+//     advanceAmount,
+//     remainingAmount,
+//     lateChargeAmount: 0,
+//     currency: "INR",
+//   };
+// }
+
 async function calculatePricingBreakdown(
   vehicles: Array<{ bikeId: string; vehicleNumber: string }>,
   fromDate: Date,
@@ -120,37 +197,69 @@ async function calculatePricingBreakdown(
   let advanceAmount = 0,
     remainingAmount = 0;
 
-  // Calculate days as 24-hour periods
+  // Calculate days
   const totalDays = calculate24HourDays(fromDate, toDate);
 
-  // Count weekend and weekday portions within the total days
+  // Split into weekday vs weekend
   const { weekendDays, weekdayDays } = calculateWeekendWeekdayDays(
     fromDate,
     toDate,
     totalDays
   );
 
-  // Get all bike details in a single query (no loops)
-  const bikeIds = vehicles.map((v) => v.bikeId);
-  const bikes = await getBikesByIds(bikeIds);
+  // Prepare conditions for matching
+  const matchConditions = vehicles.map((v) => ({
+    bikeId: v.bikeId,
+    "vehicles.vehicleNumber": v.vehicleNumber,
+  }));
 
-  if (bikes.length !== vehicles.length) {
-    throw new Error("Some bikes not found");
+  // Fetch bikes + specific vehicles in one query
+  const bikeCollection = await getCollection("bikes");
+  const results = await bikeCollection
+    .aggregate([
+      { $match: { $or: matchConditions } },
+      { $unwind: "$vehicles" },
+      {
+        $match: {
+          $or: vehicles.map((v) => ({
+            "vehicles.vehicleNumber": v.vehicleNumber,
+            bikeId: v.bikeId,
+          })),
+        },
+      },
+      {
+        $project: {
+          bikeId: 1,
+          "vehicles.vehicleNumber": 1,
+          "vehicles.status": 1,
+          "pricing.basePrice": 1,
+          "pricing.weekendMultiplier": 1,
+          "pricing.currency": 1,
+        },
+      },
+    ])
+    .toArray();
+
+  if (!results.length || results.length !== vehicles.length) {
+    throw new Error("Some bikes or vehicles not found");
   }
 
-  // Calculate pricing using functional array methods (no explicit loops)
-  const pricingCalculations = bikes.map((bike) => {
-    const basePrice = bike.pricing.basePrice;
-    const weekendMultiplier = bike.pricing.weekendMultiplier;
+  // Calculate pricing for each selected vehicle
+  const pricingCalculations = results.map((doc) => {
+    if (doc.vehicles.status !== "AVAILABLE") {
+      throw new Error(`Vehicle ${doc.vehicles.vehicleNumber} is not available`);
+    }
 
-    // Calculate amounts based on day portions
+    const basePrice = doc.pricing.basePrice;
+    const weekendMultiplier = doc.pricing.weekendMultiplier;
+
     const weekdayAmount = weekdayDays * basePrice;
     const weekendAmount = weekendDays * basePrice * weekendMultiplier;
 
     return { weekdayAmount, weekendAmount };
   });
 
-  // Sum all amounts using reduce
+  // Sum all vehicles’ amounts
   const { totalBaseAmount, totalWeekendAmount } = pricingCalculations.reduce(
     (acc, curr) => ({
       totalBaseAmount: acc.totalBaseAmount + curr.weekdayAmount,
@@ -163,7 +272,7 @@ async function calculatePricingBreakdown(
   const totalAmount = subtotalAmount;
 
   if (!fullPayment) {
-    advanceAmount = Math.round(totalAmount * 0.5); // 20% advance
+    advanceAmount = Math.round(totalAmount * 0.5); // 50% advance
     remainingAmount = totalAmount - advanceAmount;
   }
 
@@ -251,40 +360,105 @@ function countWeekendsOptimized(fromDate: Date, toDate: Date): number {
 }
 
 // Helper function to create booking vehicles with denormalized data
+// async function createBookingVehicles(
+//   vehicles: Array<{ bikeId: string; vehicleNumber: string }>
+// ): Promise<BookingVehicle[]> {
+//   const bookingVehicles: BookingVehicle[] = [];
+
+//   for (const vehicle of vehicles) {
+//     const bike = await getBikeById(vehicle.bikeId);
+//     if (!bike) {
+//       throw new Error(`Bike not found: ${vehicle.bikeId}`);
+//     }
+
+//     // Find the specific vehicle
+//     const vehicleData = bike.vehicles.find(
+//       (v) => v.vehicleNumber === vehicle.vehicleNumber
+//     );
+//     if (!vehicleData) {
+//       throw new Error(`Vehicle not found: ${vehicle.vehicleNumber}`);
+//     }
+
+//     if (vehicleData.status !== "AVAILABLE") {
+//       throw new Error(`Vehicle ${vehicle.vehicleNumber} is not available`);
+//     }
+
+//     bookingVehicles.push({
+//       bikeId: vehicle.bikeId,
+//       vehicleNumber: vehicle.vehicleNumber,
+//       modelName: bike.modelInfo.model,
+//       brand: bike.modelInfo.brand,
+//       category: bike.modelInfo.category,
+//       basePrice: bike.pricing.basePrice,
+//       weekendMultiplier: bike.pricing.weekendMultiplier,
+//       currency: bike.pricing.currency,
+//     });
+//   }
+
+//   return bookingVehicles;
+// }
+
 async function createBookingVehicles(
   vehicles: Array<{ bikeId: string; vehicleNumber: string }>
 ): Promise<BookingVehicle[]> {
-  const bookingVehicles: BookingVehicle[] = [];
+  const bookingCollection = await getCollection("bikes");
 
-  for (const vehicle of vehicles) {
-    const bike = await getBikeById(vehicle.bikeId);
-    if (!bike) {
-      throw new Error(`Bike not found: ${vehicle.bikeId}`);
-    }
+  // Build match condition for all bikeId + vehicleNumber combos
+  const conditions = vehicles.map((v) => ({
+    bikeId: v.bikeId,
+    "vehicles.vehicleNumber": v.vehicleNumber,
+  }));
 
-    // Find the specific vehicle
-    const vehicleData = bike.vehicles.find(
-      (v) => v.vehicleNumber === vehicle.vehicleNumber
-    );
-    if (!vehicleData) {
-      throw new Error(`Vehicle not found: ${vehicle.vehicleNumber}`);
-    }
+  const results = await bookingCollection
+    .aggregate([
+      { $match: { $or: conditions } }, // filter only required bikes
+      { $unwind: "$vehicles" }, // flatten vehicles array
+      {
+        $match: {
+          $or: vehicles.map((v) => ({
+            "vehicles.vehicleNumber": v.vehicleNumber,
+            bikeId: v.bikeId,
+          })),
+        },
+      },
+      {
+        $project: {
+          bikeId: 1,
+          "vehicles.vehicleNumber": 1,
+          "vehicles.status": 1,
+          "modelInfo.model": 1,
+          "modelInfo.brand": 1,
+          "modelInfo.category": 1,
+          "pricing.basePrice": 1,
+          "pricing.weekendMultiplier": 1,
+          "pricing.currency": 1,
+        },
+      },
+    ])
+    .toArray();
 
-    if (vehicleData.status !== "AVAILABLE") {
-      throw new Error(`Vehicle ${vehicle.vehicleNumber} is not available`);
-    }
-
-    bookingVehicles.push({
-      bikeId: vehicle.bikeId,
-      vehicleNumber: vehicle.vehicleNumber,
-      modelName: bike.modelInfo.model,
-      brand: bike.modelInfo.brand,
-      category: bike.modelInfo.category,
-      basePrice: bike.pricing.basePrice,
-      weekendMultiplier: bike.pricing.weekendMultiplier,
-      currency: bike.pricing.currency,
-    });
+  if (!results.length) {
+    throw new Error("No vehicles found for booking");
   }
+  console.log("results", results);
+
+  // Validate availability + transform output
+  const bookingVehicles: BookingVehicle[] = results.map((doc) => {
+    if (doc.vehicles.status !== "AVAILABLE") {
+      throw new Error(`Vehicle ${doc.vehicles.vehicleNumber} is not available`);
+    }
+
+    return {
+      bikeId: doc.bikeId,
+      vehicleNumber: doc.vehicles.vehicleNumber,
+      modelName: doc.modelInfo.model,
+      brand: doc.modelInfo.brand,
+      category: doc.modelInfo.category,
+      basePrice: doc.pricing.basePrice,
+      weekendMultiplier: doc.pricing.weekendMultiplier,
+      currency: doc.pricing.currency,
+    };
+  });
 
   return bookingVehicles;
 }
@@ -293,14 +467,16 @@ export async function createBookingOrderService(
   data: CreateBookingInputType
 ): Promise<{
   orderId: string;
+  totalAmount: PricingBreakdown["totalAmount"];
+  currentPayment: number | string;
   razorpayKey: string;
   bookingId: Booking["bookingId"];
 }> {
   // Validate input
   const validatedData = CreateBookingInput.parse(data);
 
-  // Release any expired holds first
-  await releaseExpiredHolds();
+  const results = await releaseExpiredHolds();
+  console.log("results", results);
 
   // Create booking vehicles with denormalized data
   const bookingVehicles = await createBookingVehicles(validatedData.vehicles);
@@ -341,6 +517,8 @@ export async function createBookingOrderService(
     }
   }
 
+  console.log("bookingVehicles", bookingVehicles);
+
   const payableAmount = validatedData.fullPayment
     ? pricingBreakdown.totalAmount
     : pricingBreakdown.advanceAmount;
@@ -348,7 +526,7 @@ export async function createBookingOrderService(
   const order = await razorpay.orders.create({
     amount: Math.round(payableAmount * 100), // Convert to paise
     currency: "INR",
-    receipt: `receipt_${generateNumericEpochId("RCP")}`,
+    receipt: `${generateNumericEpochId("RCP")}`,
     payment_capture: false,
   });
 
@@ -409,6 +587,8 @@ export async function createBookingOrderService(
 
   return {
     orderId: order.id,
+    totalAmount: pricingBreakdown.totalAmount,
+    currentPayment: payableAmount,
     razorpayKey: process.env.RAZORPAY_KEY_ID!,
     bookingId: bookingData.bookingId,
   };
@@ -676,51 +856,104 @@ export async function updateBookingService(
   return updatedBooking.value as Booking;
 }
 
+// export async function cancelBookingService(
+//   data: CancelBookingInputType
+// ): Promise<Booking> {
+//   const validatedData = CancelBookingInput.parse(data);
+//   const bookingCollection = await getCollection("bookings");
+
+//   const booking = (await bookingCollection.findOne({
+//     bookingId: validatedData.bookingId,
+//   })) as Booking;
+//   if (!booking) {
+//     throw new Error("Booking not found");
+//   }
+
+//   if (["COMPLETED", "CANCELLED"].includes(booking.bookingStatus)) {
+//     throw new Error(
+//       `Cannot cancel booking with status: ${booking.bookingStatus}`
+//     );
+//   }
+
+//   await releaseMultipleVehicles(
+//     booking.vehicles,
+//     BOOK_HOLD_DURATION,
+//     booking.userId as Booking["userId"]
+//   );
+
+//   // Update booking
+//   const updatedBooking = await bookingCollection.findOneAndUpdate(
+//     { bookingId: validatedData.bookingId },
+//     {
+//       $set: {
+//         bookingStatus: "CANCELLED",
+//         updatedAt: new Date(),
+//       },
+//     },
+//     { returnDocument: "after" }
+//   );
+
+//   await updatePayment({
+//     bookingId: validatedData.bookingId,
+//     status: "CANCELLED",
+//     razorpay_payment_id: "",
+//     paidAmount: 0,
+//   });
+
+//   return updatedBooking.value as Booking;
+// }
+
 export async function cancelBookingService(
   data: CancelBookingInputType
 ): Promise<Booking> {
   const validatedData = CancelBookingInput.parse(data);
   const bookingCollection = await getCollection("bookings");
 
-  const booking = (await bookingCollection.findOne({
-    bookingId: validatedData.bookingId,
-  })) as Booking;
-  if (!booking) {
-    throw new Error("Booking not found");
-  }
-
-  if (["COMPLETED", "CANCELLED"].includes(booking.bookingStatus)) {
-    throw new Error(
-      `Cannot cancel booking with status: ${booking.bookingStatus}`
-    );
-  }
-
-  await releaseMultipleVehicles(
-    booking.vehicles,
-    BOOK_HOLD_DURATION,
-    booking.userId as Booking["userId"]
-  );
-
-  // Update booking
+  // Find & update booking in one DB call with projection
   const updatedBooking = await bookingCollection.findOneAndUpdate(
-    { bookingId: validatedData.bookingId },
+    {
+      bookingId: validatedData.bookingId,
+      bookingStatus: { $nin: ["COMPLETED", "CANCELLED"] }, // only cancellable bookings
+    },
     {
       $set: {
         bookingStatus: "CANCELLED",
         updatedAt: new Date(),
       },
     },
-    { returnDocument: "after" }
+    {
+      returnDocument: "after",
+      projection: {
+        bookingId: 1,
+        vehicles: 1,
+        bookingStatus: 1,
+        userId: 1,
+      },
+    }
   );
 
-  await updatePayment({
-    bookingId: validatedData.bookingId,
-    status: "CANCELLED",
-    razorpay_payment_id: "",
-    paidAmount: 0,
-  });
+  console.log("updatedBooking", updatedBooking);
 
-  return updatedBooking.value as Booking;
+  if (!updatedBooking.bookingId) {
+    throw new Error("Booking not found or cannot be cancelled");
+  }
+
+  // Perform payment update & vehicle release in parallel
+  await Promise.all([
+    releaseMultipleVehicles(
+      updatedBooking.vehicles,
+      BOOK_HOLD_DURATION,
+      updatedBooking.userId as Booking["userId"]
+    ),
+    updatePayment({
+      bookingId: updatedBooking.bookingId,
+      status: "CANCELLED",
+      razorpay_payment_id: "",
+      paidAmount: 0,
+    }),
+  ]);
+
+  return updatedBooking;
 }
 
 export async function getBookingByIdService(

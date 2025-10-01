@@ -46,7 +46,7 @@ router.get("/health", healthCheck);
 // Protected routes (require authentication)
 router.get(
   "/getBooking/:bookingId",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(BookingById),
   getBooking
 );
@@ -59,45 +59,45 @@ router.get(
 
 router.post(
   "/getAdminBookings",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(BookingQueryInput),
   getALLBookingsForAdmin
 );
 
 router.get(
   "/getBookingStatus/:status",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(getBookingsByStatusSchema),
   getBookingsByStatus
 );
 router.post(
   "/confirmBooking",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(completeBookingSchema),
   verifyPayment
 );
 router.post(
   "/updateBooking",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(UpdateBookingInput),
   updateBooking
 );
 router.post(
   "/cancelBooking",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(CancelBookingInput),
   cancelBooking
 );
 
 // Admin routes
-router.post("/cleanup-holds", authorizeRoles, cleanupExpiredHolds);
-router.post("/activate-bookings", authorizeRoles, activateBookings);
-router.post("/completeAllbookings", authorizeRoles, completeBookings);
+router.post("/cleanup-holds", authorizeRoles(), cleanupExpiredHolds);
+router.post("/activate-bookings", authorizeRoles(), activateBookings);
+router.post("/completeAllbookings", authorizeRoles(), completeBookings);
 router.get("/getAllBookings", validateZod(BookingQueryInput), getBookings);
 
 router.post(
   "/calculateLateCharge",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(
     BookingSchema.pick({ bookingId: true }).extend({
       currentDate: z.date(),
@@ -108,7 +108,7 @@ router.post(
 
 router.post(
   "/completeBookingById",
-  authorizeRoles,
+  authorizeRoles(),
   validateZod(
     BookingSchema.pick({ bookingId: true }).extend({
       paidAmount: z.number().nonnegative(),
