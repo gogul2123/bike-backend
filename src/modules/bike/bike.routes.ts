@@ -26,12 +26,14 @@ import {
   getVehiclesByStatusHandler,
 } from "./bike.controller.ts";
 import { preprocessBikeFields } from "../../pre_processors/preprocessBikeFields.ts";
+import { authorizeRoles } from "../../middlewares/authorizeRole.ts";
 
 const router = Router();
 
 // Bike CRUD routes
 router.post(
   "/createBike",
+  authorizeRoles,
   upload.single("imageFile"),
   (req: Request, res: Response, next: NextFunction) => {
     if (!req.file) {
@@ -45,21 +47,30 @@ router.post(
   createBikeHandler
 );
 
-router.get("/getById/:bikeId", validateZod(bikeIdSchema), getBikeByIdHandler);
+router.get(
+  "/getById/:bikeId",
+  authorizeRoles,
+  validateZod(bikeIdSchema),
+  getBikeByIdHandler
+);
 
 router.post(
   "/getAllBikes",
+  authorizeRoles,
   validateZod(AvailabilityQueryInput.partial()),
   getBikesHandler
 );
+
 router.delete(
   "/deleteBike/:bikeId",
+  authorizeRoles,
   validateZod(bikeIdSchema),
   deleteBikeHandler
 );
 
 router.put(
   "/updateBike/:bikeId",
+  authorizeRoles,
   optionalFileUpload("imageFile"),
   validateZod(UpdateBikeInput),
   preprocessBikeFields,
@@ -69,18 +80,21 @@ router.put(
 // Vehicle management routes
 router.post(
   "/addVehicle/:bikeId/vehicles",
+  authorizeRoles,
   validateZod(AddVehicleInput),
   addVehicleHandler
 );
 
 router.post(
   "/updateVehicleStatus/:bikeId/updateVehicle",
+  authorizeRoles,
   validateZod(UpdateVehicleStatusInput),
   updateVehicleStatusHandler
 );
 
 router.delete(
   "/:bikeId/vehicles/:vehicleNumber",
+  authorizeRoles,
   validateZod(vehicleNumberSchema),
   removeVehicleHandler
 );
@@ -95,6 +109,7 @@ router.post(
 // Vehicle status routes
 router.get(
   "/:bikeId/vehicles",
+  authorizeRoles,
   validateZod(statusQuerySchema),
   getVehiclesByStatusHandler
 );

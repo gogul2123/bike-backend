@@ -1,21 +1,37 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../utils/jwt.ts";
 import { JWTPayload } from "../types/index.ts";
+import { envConfig } from "../config/env.ts";
+
+// Make sure you have `cookie-parser` middleware applied in Express app
 export function authenticateToken(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader?.split(" ")[1]; // Bearer <token>
+  const token = req.cookies?.authToken;
+  const role = req.cookies?.role;
+  const userId = req.cookies?.userId;
 
-  if (!token) {
-    return res.status(401).json({ message: "Token not provided" });
+  if (envConfig.nodeEnv === "development") {
+    next();
+    return;
+  }
+
+  if (!token || !role || !userId) {
+    return res.status(404).json({ message: "Authentication data not found" });
   }
 
   try {
     const user = verifyToken(token) as JWTPayload;
-    req.user = user; // Extend Express.Request type
+
+    // Attach verified user info + role + userId to request
+    req.user = {
+      ...user,
+      role,
+      userId,
+    };
+
     next();
   } catch (err) {
     return res.status(403).json({ message: "Invalid or expired token" });

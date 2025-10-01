@@ -5,6 +5,7 @@ import { stat } from "fs";
 export const updateUserSchemaZ = z.object({
   userId: z.string().nonempty("User ID is required."),
   email: z.string().email("Invalid email address.").optional(),
+  role: z.enum(["user"]).optional(),
   name: z
     .string()
     .min(3, "Name must be at least 3 characters long.")
@@ -74,6 +75,8 @@ export const searchUUsers = z.object({
 });
 
 export const getAllUser = z.object({
+  search: z.string().optional(),
+  status: z.enum(["active", "inactive", "suspended"]).optional(),
   page: z.number().min(1, "Page number must be at least 1"),
   limit: z.number().min(1, "Limit must be at least 1"),
 });

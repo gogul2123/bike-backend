@@ -82,7 +82,7 @@ export async function getBikeById(bikeId: string): Promise<Bike | null> {
   const bikeCollection = await getCollection("bikes");
   return (await bikeCollection.findOne(
     { bikeId },
-    { projection: { _id: 0 } }
+    { projection: { _id: 0, updatedAt: 0 } }
   )) as Bike | null;
 }
 
@@ -175,7 +175,23 @@ export async function getBikesService(filters: {
         { $sort: { createdAt: -1 } },
         { $skip: (page - 1) * limit },
         { $limit: limit },
-        { $project: { _id: 0 } },
+        {
+          $project: {
+            _id: 0,
+            vehicles: 0,
+            "pricing.weekendMultiplier": 0,
+            "pricing.taxIncluded": 0,
+            "pricing.currency": 0,
+            "specifications.topSpeed": 0,
+            "specifications.weight": 0,
+            "specifications.furlType": 0,
+            "modelInfo.type": 0,
+            "counters.active": 0,
+            "counters.holding": 0,
+            "counters.rented": 0,
+            "counters.maintenance": 0,
+          },
+        },
       ],
       totalCount: [{ $count: "count" }],
     },
@@ -520,7 +536,6 @@ export async function checkAvailabilityService(
 
   const matchStage: any = {
     isActive: true,
-    "counters.available": { $gte: validatedQuery.minVehicles },
   };
 
   if (validatedQuery.category)
@@ -587,7 +602,7 @@ export async function checkAvailabilityService(
     { $project: { _id: 0 } }
   );
 
-  const availableBikes = await bikeCollection.aggregate(pipeline).toArray();
+  const allBikes = await bikeCollection.aggregate(pipeline).toArray();
 
   // Find conflicting bookings for the requested date range
   const conflictingBookings = await bookingCollection
@@ -625,51 +640,73 @@ export async function checkAvailabilityService(
     });
   });
 
-  // Filter out booked vehicles from available bikes
-  const filteredBikes = availableBikes
-    .map((bike: any) => {
-      const availableVehicles = bike.vehicles
-        .filter(
-          (vehicle: any) => !bookedVehicleNumbers.has(vehicle.vehicleNumber)
-        )
-        .map((vehicle: any) => ({
-          vehicleId: vehicle.vehicleId,
-          vehicleNumber: vehicle.vehicleNumber,
-        }));
-
-      // Update counters based on filtered vehicles
-      const updatedCounters = {
-        available: availableVehicles.length,
-        total: bike.counters.total,
-      };
+  // Process all bikes and mark availability
+  const processedBikes = allBikes.map((bike: any) => {
+    const processedVehicles = bike.vehicles.map((vehicle: any) => {
+      const isVehicleAvailable = !bookedVehicleNumbers.has(
+        vehicle.vehicleNumber
+      );
 
       return {
-        bikeId: bike.bikeId,
-        modelInfo: {
-          brand: bike.modelInfo.brand,
-          model: bike.modelInfo.model,
-          imageUrl: bike.modelInfo.imageUrl,
-          transmission: bike.modelInfo.transmission,
-        },
-        vehicles: availableVehicles,
-        counters: updatedCounters,
-        price: bike.effectivePrice,
+        vehicleId: vehicle.vehicleId,
+        vehicleNumber: vehicle.vehicleNumber,
+        location: vehicle.location,
+        vehicleAvailable: isVehicleAvailable,
       };
-    })
-    .filter(
-      (bike: any) =>
-        // Only return bikes that have at least the minimum required vehicles available
-        bike.counters.available >= validatedQuery.minVehicles
-    );
+    });
+
+    // Count available vehicles
+    const availableVehiclesCount = processedVehicles.filter(
+      (v: any) => v.vehicleAvailable
+    ).length;
+
+    // Bike is available if it has at least the minimum required vehicles available
+    const isBikeAvailable =
+      availableVehiclesCount >= validatedQuery.minVehicles;
+
+    // Update counters based on availability
+    const updatedCounters = {
+      available: availableVehiclesCount,
+      total: bike.counters.total,
+      booked: bike.counters.total - availableVehiclesCount,
+    };
+
+    return {
+      bikeId: bike.bikeId,
+      modelInfo: {
+        brand: bike.modelInfo.brand,
+        model: bike.modelInfo.model,
+        imageUrl: bike.modelInfo.imageUrl,
+        transmission: bike.modelInfo.transmission,
+        category: bike.modelInfo.category,
+        specification: bike.modelInfo.specifications,
+      },
+      vehicles: processedVehicles,
+      counters: updatedCounters,
+      price: bike.effectivePrice,
+      available: isBikeAvailable,
+    };
+  });
+
+  // Separate available and unavailable bikes
+  const availableBikes = processedBikes.filter((bike: any) => bike.available);
+  const unavailableBikes = processedBikes.filter(
+    (bike: any) => !bike.available
+  );
+
+  // Combine with available bikes first, then unavailable
+  const sortedBikes = [...availableBikes, ...unavailableBikes];
 
   // Calculate pagination metadata
-  const totalAfterFiltering = filteredBikes.length;
+  const totalAfterProcessing = processedBikes.length;
+  const totalAvailable = availableBikes.length;
+  const totalUnavailable = unavailableBikes.length;
   const totalPages = Math.ceil(totalBeforeFiltering / validatedQuery.limit);
   const hasNextPage = validatedQuery.page < totalPages;
   const hasPreviousPage = validatedQuery.page > 1;
 
   return {
-    data: filteredBikes,
+    data: sortedBikes,
     pagination: {
       currentPage: validatedQuery.page,
       limit: validatedQuery.limit,
@@ -677,7 +714,9 @@ export async function checkAvailabilityService(
       totalPages,
       hasNextPage,
       hasPreviousPage,
-      totalFiltered: totalAfterFiltering,
+      totalFiltered: totalAfterProcessing,
+      totalAvailable,
+      totalUnavailable,
     },
   };
 }

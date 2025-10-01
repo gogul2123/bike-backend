@@ -11,6 +11,7 @@ import bookingRoute from "./modules/booking/booking.routes.ts";
 import contactRoute from "./modules/contact/contact.route.ts";
 import paymentRoute from "./modules/payment/payment.route.ts";
 import adminRoute from "./modules/admin/dashboad.routes.ts";
+import { authenticateToken } from "./middlewares/auth.ts";
 // import uploadRouter from "./modules/fileUpload/upload.route.ts";
 
 app.use(express.json());
@@ -22,9 +23,10 @@ app.use(
     origin: "http://localhost:3000",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
   })
 );
+
+app.use(authenticateToken);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoute);

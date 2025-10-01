@@ -5,6 +5,7 @@ import {
   getUser,
   getAllUser,
   searchUUsers,
+  userSchema,
 } from "./user.model.ts";
 import {
   UpdateInitialData,
@@ -12,7 +13,7 @@ import {
   getUserHandler,
   getAllUsersHandler,
   dashboardHandler,
-  searchUsersHandler,
+  deleteUser,
 } from "./user.controller.ts";
 import { validateZod } from "../../middlewares/validate.ts";
 
@@ -30,8 +31,14 @@ router.post("/get-user", validateZod(getUser), getUserHandler);
 
 router.post("/get-all-users", validateZod(getAllUser), getAllUsersHandler);
 
-router.post("/search-users", validateZod(searchUUsers), searchUsersHandler);
+// router.post("/search-users", validateZod(searchUUsers), searchUsersHandler);
 
 router.get("/dashboard/:userId", dashboardHandler);
+
+router.get(
+  "/delete/:userId",
+  validateZod(userSchema.pick({ userId: true })),
+  deleteUser
+);
 
 export default router;

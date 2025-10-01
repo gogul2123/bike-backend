@@ -161,3 +161,37 @@ export async function resetPasswordHandler(req: Request, res: Response) {
     sendError(res, 500, "Internal server error");
   }
 }
+
+export async function logoutHandler(req: Request, res: Response) {
+  try {
+    // Clear cookies by setting them with maxAge = 0
+    res.cookie("authToken", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+
+    res.cookie("role", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+
+    res.cookie("userId", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+
+    sendSuccess(res, { message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Error in logout:", error);
+    sendError(res, 500, "Internal server error");
+  }
+}

@@ -117,10 +117,14 @@ export async function updateUserInitialData(
 
 export async function updateUser(data: UpdateUserInput): Promise<any | null> {
   const col = await getCollection("users");
+
   const result = await col.updateOne(
     { userId: data.userId },
-    { $set: { ...data, updatedAt: new Date(), status: "active" } }
+    { $set: { ...data, updatedAt: new Date() } }
   );
+  const userData = await getUserByID(data.userId);
+  console.log("result", result);
+  console.log("userData", userData);
   if (result.modifiedCount === 0) {
     throw new Error("User not found or no changes made");
   }
@@ -219,8 +223,109 @@ export async function getUserByID(
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getAllUsers(): Promise<any[]> {
+// export async function getAllUsers(data?: {
+//   search?: string;
+//   status?: string;
+//   page?: number;
+//   limit?: number;
+// }): Promise<any[]> {
+//   const col = await getCollection("users");
+//   const users = await col.find({}).toArray();
+//   return users;
+// }
+
+export async function getAllUsers(params?: {
+  search?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  userCount: number;
+  activeUserCount: number;
+  inactiveUserCount: number;
+  users: any[];
+}> {
   const col = await getCollection("users");
-  const users = await col.find({}).toArray();
-  return users;
+
+  const { search = "", status, page = 1, limit = 10 } = params || {};
+
+  // Build match stage
+  const matchStage: any = {};
+
+  if (search) {
+    matchStage.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  if (status) {
+    matchStage.status = status;
+  }
+
+  const pipeline = [
+    ...(Object.keys(matchStage).length > 0 ? [{ $match: matchStage }] : []),
+    {
+      $facet: {
+        metadata: [
+          { $count: "userCount" },
+          {
+            $addFields: {
+              activeUserCount: {
+                $cond: [{ $eq: [status, "active"] }, "$userCount", 0],
+              },
+              inactiveUserCount: {
+                $cond: [{ $eq: [status, "inactive"] }, "$userCount", 0],
+              },
+            },
+          },
+        ],
+        counts: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+              active: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", "active"] }, 1, 0],
+                },
+              },
+              inactive: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", "inactive"] }, 1, 0],
+                },
+              },
+            },
+          },
+        ],
+        users: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+      },
+    },
+    {
+      $project: {
+        userCount: { $arrayElemAt: ["$counts.total", 0] },
+        activeUserCount: { $arrayElemAt: ["$counts.active", 0] },
+        inactiveUserCount: { $arrayElemAt: ["$counts.inactive", 0] },
+        users: 1,
+      },
+    },
+  ];
+
+  const result = await col.aggregate(pipeline).toArray();
+
+  if (result.length === 0) {
+    return {
+      userCount: 0,
+      activeUserCount: 0,
+      inactiveUserCount: 0,
+      users: [],
+    };
+  }
+
+  return {
+    userCount: result[0].userCount || 0,
+    activeUserCount: result[0].activeUserCount || 0,
+    inactiveUserCount: result[0].inactiveUserCount || 0,
+    users: result[0].users || [],
+  };
 }

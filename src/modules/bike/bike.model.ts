@@ -178,8 +178,21 @@ export const AvailabilityQueryInput = z
       z.date({ message: "toDate is required" })
     ),
     category: z.string().optional(),
-    minPrice: z.number().positive().optional(),
-    maxPrice: z.number().positive().optional(),
+    minPrice: z.preprocess((val) => {
+      if (typeof val === "string" && val.trim() !== "") {
+        const parsed = Number(val);
+        return isNaN(parsed) ? val : parsed;
+      }
+      return val;
+    }, z.number().positive().optional()),
+
+    maxPrice: z.preprocess((val) => {
+      if (typeof val === "string" && val.trim() !== "") {
+        const parsed = Number(val);
+        return isNaN(parsed) ? val : parsed;
+      }
+      return val;
+    }, z.number().positive().optional()),
     location: z.string().optional(),
     transmission: z.enum(transmission).optional(),
     brand: z.string().optional(),

@@ -13,14 +13,26 @@ import {
   getContact,
   replyContact,
 } from "./contact.model.ts";
+import { authorizeRoles } from "../../middlewares/authorizeRole.ts";
 
 const router = Router();
 
 router.post("/contact", validateZod(contactInput), contactHandler);
-router.post("/getContacts", validateZod(getContact), getContactHandler);
-router.post("/contact/reply", validateZod(replyContact), replyContactHandler);
+router.post(
+  "/getContacts",
+  authorizeRoles,
+  validateZod(getContact),
+  getContactHandler
+);
+router.post(
+  "/contact/reply",
+  authorizeRoles,
+  validateZod(replyContact),
+  replyContactHandler
+);
 router.get(
   "/contact/:contactId",
+  authorizeRoles,
   validateZod(ContactSchema.pick({ contactId: true })),
   getContactByIdHandler
 );
