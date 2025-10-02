@@ -48,6 +48,8 @@ export async function verifyOtpHandler(req: Request, res: Response) {
       role: user.role,
     });
 
+    console.log("token", user);
+
     res.cookie("authToken", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

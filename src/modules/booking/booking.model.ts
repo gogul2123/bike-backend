@@ -52,7 +52,7 @@ export const PricingBreakdownSchema = z.object({
   totalWeekdayCount: z.number().nonnegative(),
   totalWeekendCount: z.number().nonnegative(),
   advanceAmount: z.number().nonnegative().default(0),
-  remainingAmount: z.number().positive().default(0),
+  remainingAmount: z.number().nonnegative().default(0),
   lateChargeAmount: z.number().nonnegative().default(0),
   currency: z.string().default("INR"),
 });
@@ -214,7 +214,6 @@ export const CreateBookingInput = z
 
 export const UpdateBookingInput = z.object({
   bookingId: z.string().min(1, "BookingId is required"),
-  bookingStatus: z.enum(bookingStatus).optional(),
   features: z
     .object({
       pickupLocation: z.string().optional(),

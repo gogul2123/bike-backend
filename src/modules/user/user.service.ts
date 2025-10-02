@@ -131,18 +131,6 @@ export async function updateUser(data: UpdateUserInput): Promise<any | null> {
   return result;
 }
 
-// export async function getUserByID(
-//   userId: string,
-//   projection?: Record<string, any>
-// ): Promise<User | null> {
-//   const col = await getCollection("users");
-//   const user = await col.findOne(
-//     { userId },
-//     { projection: { password: 0, _id: 0, ...projection } }
-//   );
-//   return user;
-// }
-
 export async function getUserByID(
   userId: string,
   projection?: Record<string, any>
@@ -163,7 +151,12 @@ export async function getUserByID(
               $expr: {
                 $and: [
                   { $eq: ["$userId", "$$userIdVar"] },
-                  { $in: ["$bookingStatus", ["CONFIRMED", "COMPLETED"]] },
+                  {
+                    $in: [
+                      "$bookingStatus",
+                      ["CONFIRMED", "COMPLETED", "DELIVERED"],
+                    ],
+                  },
                 ],
               },
             },
@@ -203,7 +196,7 @@ export async function getUserByID(
             $map: {
               input: "$userPayments",
               as: "p",
-              in: "$$p.amount",
+              in: "$$p.totalAmount",
             },
           },
         },
@@ -214,7 +207,6 @@ export async function getUserByID(
       $project: {
         password: 0,
         _id: 0,
-        ...projection,
       },
     },
   ];
@@ -222,6 +214,102 @@ export async function getUserByID(
   const result = await col.aggregate(pipeline).toArray();
   return result.length > 0 ? result[0] : null;
 }
+
+// export async function getUserByID(
+//   userId: string,
+//   projection?: Record<string, any>
+// ): Promise<User | null | any> {
+//   const col = await getCollection("users");
+//   const colData = await getCollection("bookings");
+//   const colPayment = await getCollection("payments");
+
+//   // Debug: Check what we're searching for
+//   console.log("Searching for userId:", userId, "Type:", typeof userId);
+//   const payment = await colPayment.find({ userId }).toArray();
+//   const booking = await colData.find({ userId }).toArray();
+//   console.log("payment", payment);
+//   //console.log("booking", booking);
+
+//   const pipeline = [
+//     { $match: { userId } },
+
+//     {
+//       $lookup: {
+//         from: "bookings",
+//         let: { uid: "$userId" },
+//         pipeline: [
+//           {
+//             $match: {
+//               $expr: {
+//                 $and: [
+//                   { $eq: ["$userId", "$$uid"] },
+//                   {
+//                     $in: [
+//                       "$bookingStatus",
+//                       ["CONFIRMED", "COMPLETED", "DELIVERED"],
+//                     ],
+//                   },
+//                 ],
+//               },
+//             },
+//           },
+//         ],
+//         as: "userBookings",
+//       },
+//     },
+//     {
+//       $lookup: {
+//         from: "payments",
+//         let: { uid: "$userId" },
+//         pipeline: [
+//           {
+//             $match: {
+//               $expr: {
+//                 $and: [
+//                   { $eq: ["$userId", "$$uid"] },
+//                   { $eq: ["$status", "SUCCESS"] },
+//                 ],
+//               },
+//             },
+//           },
+//         ],
+//         as: "userPayments",
+//       },
+//     },
+
+//     // Debug: Add this stage temporarily to see what's in the lookup
+//     {
+//       $addFields: {
+//         debugUserId: "$userId",
+//         debugBookingsCount: { $size: "$userBookings" },
+//         debugPaymentsCount: { $size: "$userPayments" },
+//       },
+//     },
+
+//     {
+//       $addFields: {
+//         totalBookings: { $size: "$userBookings" },
+//         totalPaymentAmount: { $sum: "$userPayments.totalAmount" },
+//         totalPaidAmount: { $sum: "$userPayments.paidAmount" },
+//         totalAdvanceAmount: { $sum: "$userPayments.advanceAmount" },
+//         totalRemainingAmount: { $sum: "$userPayments.remainingAmount" },
+//       },
+//     },
+//     {
+//       $project: {
+//         password: 0,
+//         _id: 0,
+//       },
+//     },
+//   ];
+
+//   const result = await col.aggregate(pipeline).toArray();
+
+//   // Debug: Log the result
+//   console.log("Result:", JSON.stringify(result, null, 2));
+
+//   return result.length > 0 ? result[0] : null;
+// }
 
 // export async function getAllUsers(data?: {
 //   search?: string;

@@ -17,6 +17,7 @@ import {
   completeBookingById,
   getALLBookingsForAdmin,
   calculateLateCharge,
+  createAdminBooking,
 } from "./booking.controller.ts";
 import {
   BookingById,
@@ -115,6 +116,13 @@ router.post(
     })
   ),
   completeBookingById
+);
+
+router.post(
+  "/createAdminBooking",
+  authorizeRoles(),
+  validateZod(CreateBookingInput),
+  createAdminBooking
 );
 
 export default router;

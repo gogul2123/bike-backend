@@ -30,6 +30,8 @@ import {
   BookingQueryInput,
 } from "./booking.model.ts";
 import { Bike } from "../bike/bike.model.ts";
+import { Payment } from "../payment/payment.model.ts";
+import { promise } from "zod";
 
 export const BOOK_HOLD_DURATION = 15 * 60 * 1000; // 15 minutes
 
@@ -239,6 +241,8 @@ async function calculatePricingBreakdown(
       },
     ])
     .toArray();
+
+  console.log("results", results);
 
   if (!results.length || results.length !== vehicles.length) {
     throw new Error("Some bikes or vehicles not found");
@@ -517,8 +521,6 @@ export async function createBookingOrderService(
     }
   }
 
-  console.log("bookingVehicles", bookingVehicles);
-
   const payableAmount = validatedData.fullPayment
     ? pricingBreakdown.totalAmount
     : pricingBreakdown.advanceAmount;
@@ -563,12 +565,15 @@ export async function createBookingOrderService(
     idProof: validatedData.idProof,
   };
 
+  console.log("payable amount", payableAmount);
+
   // Validate and save booking
   const validatedBooking = BookingSchema.parse(bookingData);
-  const bookingCollection = await getCollection("bookings");
-  await bookingCollection.insertOne(validatedBooking);
 
   if (validatedBooking) {
+    const bookingCollection = await getCollection("bookings");
+    await bookingCollection.insertOne(validatedBooking);
+
     await savePayment({
       bookingId: validatedBooking?.bookingId as string,
       paymentId: generateNumericEpochId("PAY"),
@@ -583,23 +588,31 @@ export async function createBookingOrderService(
       advanceAmount: validatedBooking.pricing.advanceAmount,
       remainingAmount: validatedBooking.pricing.remainingAmount,
     });
-  }
 
-  return {
-    orderId: order.id,
-    totalAmount: pricingBreakdown.totalAmount,
-    currentPayment: payableAmount,
-    razorpayKey: process.env.RAZORPAY_KEY_ID!,
-    bookingId: bookingData.bookingId,
-  };
+    return {
+      orderId: order.id,
+      totalAmount: pricingBreakdown.totalAmount,
+      currentPayment: payableAmount,
+      razorpayKey: process.env.RAZORPAY_KEY_ID!,
+      bookingId: bookingData.bookingId,
+    };
+  } else {
+    releaseMultipleVehicles(
+      validatedData.vehicles,
+      BOOK_HOLD_DURATION,
+      validatedData.userId
+    );
+    throw new Error("Failed to create booking");
+  }
 }
 
 export async function createAdminBookingService(
   data: CreateBookingInputType
 ): Promise<{
+  paymentId: Payment["paymentId"];
   payment: Booking["pricing"];
   bookingId: Booking["bookingId"];
-}> {
+} | null> {
   // Validate input
   const validatedData = CreateBookingInput.parse(data);
 
@@ -688,25 +701,41 @@ export async function createAdminBookingService(
   await bookingCollection.insertOne(validatedBooking);
 
   // Save payment (without Razorpay)
-  await savePayment({
-    bookingId: bookingData.bookingId as string,
-    paymentId: generateNumericEpochId("PAY"),
-    userId: validatedBooking.userId,
-    paidAmount: payableAmount,
-    totalAmount: validatedBooking.pricing.totalAmount,
-    razorpay_order_id: "", // Not applicable
-    razorpay_payment_id: "", // Not applicable
-    status: "SUCCESS",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    advanceAmount: validatedBooking.pricing.advanceAmount,
-    remainingAmount: validatedBooking.pricing.remainingAmount,
-  });
+  if (validatedBooking) {
+    const paymentId = generateNumericEpochId("PAY");
+    savePayment({
+      bookingId: bookingData.bookingId as string,
+      paymentId: paymentId,
+      userId: validatedBooking.userId,
+      paidAmount: payableAmount,
+      totalAmount: validatedBooking.pricing.totalAmount,
+      razorpay_order_id: "", // Not applicable
+      razorpay_payment_id: "", // Not applicable
+      status: "SUCCESS",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      advanceAmount: validatedBooking.pricing.advanceAmount,
+      remainingAmount: validatedBooking.pricing.remainingAmount,
+    }),
+      releaseMultipleVehicles(
+        bookingData.vehicles,
+        BOOK_HOLD_DURATION,
+        bookingData.userId as Booking["userId"]
+      );
 
-  return {
-    payment: bookingData.pricing,
-    bookingId: bookingData.bookingId,
-  };
+    return {
+      paymentId: paymentId,
+      payment: bookingData.pricing,
+      bookingId: bookingData.bookingId,
+    };
+  } else {
+    releaseMultipleVehicles(
+      bookingData.vehicles,
+      BOOK_HOLD_DURATION,
+      bookingData.userId as Booking["userId"]
+    );
+    return null;
+  }
 }
 
 export async function completeBookingPaymentService(
@@ -759,11 +788,11 @@ export async function completeBookingPaymentService(
     try {
       // Capture payment
       const payableAmount =
-        (booking.pricing.totalAmount - booking.pricing.remainingAmount) * 100;
+        booking.pricing.totalAmount - booking.pricing.remainingAmount;
 
       const result = await razorpay.payments.capture(
         razorpay_payment_id,
-        Math.round(payableAmount),
+        Math.round(payableAmount * 100),
         "INR"
       );
 
@@ -832,9 +861,9 @@ export async function updateBookingService(
     updatedAt: new Date(),
   };
 
-  if (validatedData.bookingStatus) {
-    updateFields.bookingStatus = validatedData.bookingStatus;
-  }
+  // if (validatedData.bookingStatus) {
+  //   updateFields.bookingStatus = validatedData.bookingStatus;
+  // }
 
   if (validatedData.features) {
     Object.keys(validatedData.features).forEach((key) => {

@@ -13,14 +13,18 @@ import {
   completeBookingsService,
   calculateLateDeliveryCharges,
   completeBookingWithPayment,
+  createAdminBookingService,
 } from "./booking.service.ts";
 import { sendError, sendSuccess } from "../../utils/response.ts";
 import { releaseMultipleVehicles } from "../bike/bike.service.ts";
-import { BookingQueryInputType } from "./booking.model.ts";
+import {
+  BookingQueryInputType,
+  CreateBookingInputType,
+} from "./booking.model.ts";
 
 export const createBookingOrder = async (req: Request, res: Response) => {
   try {
-    const bookingData = req.body;
+    const bookingData = req.body as CreateBookingInputType;
     const result = await createBookingOrderService(bookingData);
     sendSuccess(res, result, "Booking order created successfully");
   } catch (err: any) {
@@ -294,6 +298,21 @@ export const getALLBookingsForAdmin = async (req: Request, res: Response) => {
     sendSuccess(res, result, "Bookings retrieved successfully");
   } catch (err: any) {
     sendError(res, 500, err.message);
+    return;
+  }
+};
+
+export const createAdminBooking = async (req: Request, res: Response) => {
+  try {
+    const bookingData = req.body as CreateBookingInputType;
+    const result = await createAdminBookingService(bookingData);
+    if (!result) {
+      sendError(res, 400, "Unable to create booking");
+      return;
+    }
+    sendSuccess(res, result, "Booking created successfully");
+  } catch (error: any) {
+    sendError(res, 500, error.message);
     return;
   }
 };

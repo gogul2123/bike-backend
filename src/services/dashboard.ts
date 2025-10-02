@@ -58,7 +58,11 @@ export async function getBookingsAndRecommendations(
       {
         $match: {
           userId: userId,
-          $or: [{ bookingStatus: "CONFIRMED" }, { bookingStatus: "COMPLETED" }],
+          $or: [
+            { bookingStatus: "CONFIRMED" },
+            { bookingStatus: "COMPLETED" },
+            { bookingStatus: "DELIVERED" },
+          ],
         },
       },
 
